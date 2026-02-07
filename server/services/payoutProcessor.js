@@ -17,6 +17,13 @@ const { PAYOUT_STATUS } = require('../models/PayoutRequest.js');
 const { BATCH_STATUS, BATCH_TYPE } = require('../models/PayoutBatch.js');
 const { TRANSACTION_STATUS } = require('../models/PayoutTransaction.js');
 const { PROVIDER_STATUS, PROVIDER_TYPES } = require('../models/PayoutProvider.js');
+// Fallback (prevents crashes if PROVIDER_TYPES is undefined at runtime)
+const SAFE_PROVIDER_TYPES = {
+  KBZPAY: 'kbzpay',
+  WAVEPAY: 'wavepay',
+  CBPAY: 'cbpay',
+  BANK_TRANSFER: 'bank_transfer',
+};
 const { sendPayoutNotification } = require('./notificationService.js');
 
 // ==================== MOCK PROVIDER IMPLEMENTATIONS ====================
@@ -310,38 +317,63 @@ class PayoutProcessor {
   }
 
   /**
-   * Register a provider instance
-   * @param {Object} providerConfig - Provider configuration from database
-   */
-  registerProvider(providerConfig) {
-    let providerInstance;
+ * Register a provider instance
+ * @param {Object} providerConfig - Provider configuration from database
+ */
+registerProvider(providerConfig) {
+  if (!providerConfig || !providerConfig.type) {
+    console.warn('[PayoutProcessor] Invalid provider config — skipping');
+    return;
+  }
 
-    switch (providerConfig.type) {
-      case PROVIDER_TYPES.KBZPAY:
-        providerInstance = new KBZPayProvider(providerConfig.apiConfig);
-        break;
-      case PROVIDER_TYPES.WAVEPAY:
-        providerInstance = new WavePayProvider(providerConfig.apiConfig);
-        break;
-      case PROVIDER_TYPES.CBPAY:
-        providerInstance = new CBPayProvider(providerConfig.apiConfig);
-        break;
-      case PROVIDER_TYPES.BANK_TRANSFER:
-        providerInstance = new BankTransferProvider(
-          providerConfig.apiConfig,
-          providerConfig.bankCode
-        );
-        break;
-      default:
-        console.warn(`[PayoutProcessor] Unknown provider type: ${providerConfig.type}`);
-        return;
-    }
+  // Fallback provider types (prevents runtime crash)
+  const SAFE_PROVIDER_TYPES = {
+    KBZPAY: 'kbzpay',
+    WAVEPAY: 'wavepay',
+    CBPAY: 'cbpay',
+    BANK_TRANSFER: 'bank_transfer',
+  };
 
-    this.providers.set(providerConfig.code, {
-      instance: providerInstance,
-      config: providerConfig,
-    });
+  // Use exported PROVIDER_TYPES if available, otherwise fallback
+  const TYPES =
+    PROVIDER_TYPES && typeof PROVIDER_TYPES === 'object'
+      ? PROVIDER_TYPES
+      : SAFE_PROVIDER_TYPES;
 
+  let providerInstance;
+
+  switch (providerConfig.type) {
+    case TYPES.KBZPAY:
+      providerInstance = new KBZPayProvider(providerConfig.apiConfig);
+      break;
+
+    case TYPES.WAVEPAY:
+      providerInstance = new WavePayProvider(providerConfig.apiConfig);
+      break;
+
+    case TYPES.CBPAY:
+      providerInstance = new CBPayProvider(providerConfig.apiConfig);
+      break;
+
+    case TYPES.BANK_TRANSFER:
+      providerInstance = new BankTransferProvider(
+        providerConfig.apiConfig,
+        providerConfig.bankCode
+      );
+      break;
+
+    default:
+      console.warn(
+        `[PayoutProcessor] Unknown provider type: ${providerConfig.type}`
+      );
+      return;
+  }
+
+  this.providers.set(providerConfig.code, {
+    instance: providerInstance,
+    config: providerConfig,
+  });
+}
     console.log(`[PayoutProcessor] Registered provider: ${providerConfig.code}`);
   }
 
