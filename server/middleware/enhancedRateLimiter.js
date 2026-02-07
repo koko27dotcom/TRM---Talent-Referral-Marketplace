@@ -540,5 +540,3 @@ module.exports = {
   getUserTier,
   generateKey,
 };
-</parameter name="new_string">
-</invoke>
