@@ -1,0 +1,527 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trm-app
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: app
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: trm-app
+    version: "1.0.0"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: trm
+      app.kubernetes.io/component: app
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: trm
+        app.kubernetes.io/component: app
+        app.kubernetes.io/part-of: trm-platform
+        app.kubernetes.io/instance: trm-app
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+        # Force redeployment when config changes
+        checksum/config: "{{ include (print $.Template.BasePath \"/configmap.yaml\") . | sha256sum }}"
+        checksum/secrets: "{{ include (print $.Template.BasePath \"/secret.yaml\") . | sha256sum }}"
+    spec:
+      serviceAccountName: trm-app-sa
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - trm
+                topologyKey: kubernetes.io/hostname
+        podAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 50
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - mongodb
+                        - redis
+                topologyKey: kubernetes.io/hostname
+      initContainers:
+        - name: wait-for-mongodb
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for MongoDB to be ready..."
+              until nc -z mongodb-0.mongodb 27017 && \
+                    nc -z mongodb-1.mongodb 27017 && \
+                    nc -z mongodb-2.mongodb 27017; do
+                echo "MongoDB is not ready yet. Retrying in 5 seconds..."
+                sleep 5
+              done
+              echo "MongoDB is ready!"
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "16Mi"
+            limits:
+              cpu: "50m"
+              memory: "64Mi"
+        - name: wait-for-redis
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Redis to be ready..."
+              until nc -z redis 6379; do
+                echo "Redis is not ready yet. Retrying in 5 seconds..."
+                sleep 5
+              done
+              echo "Redis is ready!"
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "16Mi"
+            limits:
+              cpu: "50m"
+              memory: "64Mi"
+        - name: db-migrations
+          image: trm/platform:latest
+          imagePullPolicy: Always
+          command:
+            - npm
+            - run
+            - migrate
+          envFrom:
+            - configMapRef:
+                name: trm-app-config
+            - secretRef:
+                name: trm-app-secrets
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+      containers:
+        - name: trm-app
+          image: trm/platform:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: trm-app-config
+            - secretRef:
+                name: trm-app-secrets
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2000m"
+              memory: "4Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+              httpHeaders:
+                - name: Accept
+                  value: application/json
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+              httpHeaders:
+                - name: Accept
+                  value: application/json
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+            successThreshold: 1
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: cache
+              mountPath: /app/cache
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    echo "Received SIGTERM, starting graceful shutdown..."
+                    # Signal the application to stop accepting new connections
+                    curl -X POST localhost:3000/admin/shutdown || true
+                    # Wait for existing requests to complete
+                    sleep 15
+                    echo "Graceful shutdown complete"
+        - name: nginx
+          image: nginx:1.25-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: nginx
+              containerPort: 80
+              protocol: TCP
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: nginx
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: nginx
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 101
+            runAsGroup: 101
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 100Mi
+        - name: cache
+          emptyDir:
+            sizeLimit: 500Mi
+        - name: nginx-config
+          configMap:
+            name: trm-nginx-config
+      terminationGracePeriodSeconds: 60
+      imagePullSecrets:
+        - name: trm-registry-secret
+---
+# Service Account for the application
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: trm-app-sa
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: app
+    app.kubernetes.io/part-of: trm-platform
+automountServiceAccountToken: false
+---
+# Role for the application (minimal permissions)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: trm-app-role
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: app
+    app.kubernetes.io/part-of: trm-platform
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list"]
+    resourceNames: ["trm-app-config"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+    resourceNames: ["trm-app-secrets"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: trm-app-rolebinding
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: app
+    app.kubernetes.io/part-of: trm-platform
+subjects:
+  - kind: ServiceAccount
+    name: trm-app-sa
+    namespace: trm
+roleRef:
+  kind: Role
+  name: trm-app-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# Background Job Worker Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trm-worker
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: trm-worker
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 50%
+      maxUnavailable: 0%
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: trm
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: trm
+        app.kubernetes.io/component: worker
+        app.kubernetes.io/part-of: trm-platform
+        app.kubernetes.io/instance: trm-worker
+    spec:
+      serviceAccountName: trm-app-sa
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/component
+                      operator: In
+                      values:
+                        - worker
+                topologyKey: kubernetes.io/hostname
+      initContainers:
+        - name: wait-for-dependencies
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z mongodb 27017 && nc -z redis 6379; do
+                sleep 2
+              done
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "16Mi"
+      containers:
+        - name: worker
+          image: trm/platform:latest
+          imagePullPolicy: Always
+          command:
+            - npm
+            - run
+            - worker
+          envFrom:
+            - configMapRef:
+                name: trm-app-config
+            - secretRef:
+                name: trm-app-secrets
+          env:
+            - name: WORKER_TYPE
+              value: "background"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "2Gi"
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "ps aux | grep -v grep | grep 'npm run worker' || exit 1"
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 100Mi
+      terminationGracePeriodSeconds: 30
+      imagePullSecrets:
+        - name: trm-registry-secret
+---
+# CronJob for scheduled tasks
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: trm-cron
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: cron
+    app.kubernetes.io/part-of: trm-platform
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: trm
+            app.kubernetes.io/component: cron
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: trm-app-sa
+          containers:
+            - name: cron
+              image: trm/platform:latest
+              imagePullPolicy: IfNotPresent
+              command:
+                - npm
+                - run
+                - cron
+              envFrom:
+                - configMapRef:
+                    name: trm-app-config
+                - secretRef:
+                    name: trm-app-secrets
+              resources:
+                requests:
+                  cpu: "100m"
+                  memory: "256Mi"
+                limits:
+                  cpu: "500m"
+                  memory: "512Mi"
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                runAsNonRoot: true
+                runAsUser: 1000
+          imagePullSecrets:
+            - name: trm-registry-secret
+---
+# PodDisruptionBudget for application
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: trm-app-pdb
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: app
+    app.kubernetes.io/part-of: trm-platform
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: trm
+      app.kubernetes.io/component: app
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: trm-worker-pdb
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/part-of: trm-platform
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: trm
+      app.kubernetes.io/component: worker

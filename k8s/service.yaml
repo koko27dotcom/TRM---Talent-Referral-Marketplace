@@ -1,0 +1,341 @@
+# TRM Application Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: trm-app
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: app
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: trm-app
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: app
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+  sessionAffinity: None
+  publishNotReadyAddresses: false
+---
+# TRM Application Headless Service (for direct pod access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: trm-app-headless
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: app
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: trm-app-headless
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: app
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+      protocol: TCP
+---
+# TRM Worker Service (for internal communication)
+apiVersion: v1
+kind: Service
+metadata:
+  name: trm-worker
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: trm-worker
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: worker
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+      protocol: TCP
+---
+# MongoDB Service (defined in mongodb-deployment.yaml but included here for completeness)
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-service
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: mongodb
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: mongodb-service
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9216"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: mongodb
+    app.kubernetes.io/component: database
+  ports:
+    - name: mongodb
+      port: 27017
+      targetPort: 27017
+      protocol: TCP
+---
+# MongoDB Headless Service for StatefulSet
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: mongodb
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: mongodb
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: mongodb
+    app.kubernetes.io/component: database
+  ports:
+    - name: mongodb
+      port: 27017
+      targetPort: 27017
+      protocol: TCP
+---
+# Redis Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: redis-service
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9121"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: cache
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+      protocol: TCP
+---
+# Redis Headless Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-headless
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: cache
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: redis-headless
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: cache
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+      protocol: TCP
+---
+# Redis Sentinel Service (for HA setup)
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-sentinel
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: redis-sentinel
+    app.kubernetes.io/component: cache-ha
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: redis-sentinel
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: redis-ha
+    app.kubernetes.io/component: cache-ha
+  ports:
+    - name: sentinel
+      port: 26379
+      targetPort: 26379
+      protocol: TCP
+---
+# LoadBalancer Service for External Access
+apiVersion: v1
+kind: Service
+metadata:
+  name: trm-lb
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: loadbalancer
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: trm-lb
+  annotations:
+    # AWS Load Balancer annotations
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "http"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/health"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "traffic-port"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval: "30"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-timeout: "5"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-healthy-threshold: "2"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-unhealthy-threshold: "3"
+    # Azure annotations (alternative)
+    # service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path: "/health"
+    # GCP annotations (alternative)
+    # cloud.google.com/load-balancer-type: "External"
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: app
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: 3000
+      protocol: TCP
+  sessionAffinity: None
+  externalTrafficPolicy: Local
+  healthCheckNodePort: 30000
+---
+# Internal LoadBalancer for private API access
+apiVersion: v1
+kind: Service
+metadata:
+  name: trm-internal-lb
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: internal-lb
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: trm-internal-lb
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
+    service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: app
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+      protocol: TCP
+  sessionAffinity: None
+  externalTrafficPolicy: Cluster
+---
+# NodePort Service for direct node access (development/debugging)
+apiVersion: v1
+kind: Service
+metadata:
+  name: trm-nodeport
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: nodeport
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: trm-nodeport
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: app
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+      nodePort: 30080
+      protocol: TCP
+  sessionAffinity: None
+---
+# ExternalName service for external dependencies (example)
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-api
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: external-api
+    app.kubernetes.io/component: external
+    app.kubernetes.io/part-of: trm-platform
+spec:
+  type: ExternalName
+  externalName: api.external-service.com
+---
+# EndpointSlice for advanced traffic management (optional)
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: trm-app-endpointslice
+  namespace: trm
+  labels:
+    kubernetes.io/service-name: trm-app
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: app
+addressType: IPv4
+ports:
+  - name: http
+    appProtocol: http
+    port: 3000
+    protocol: TCP
+endpoints:
+  - addresses:
+      - "10.0.1.10"
+    conditions:
+      ready: true
+    nodeName: node-1
+  - addresses:
+      - "10.0.1.11"
+    conditions:
+      ready: true
+    nodeName: node-2
+  - addresses:
+      - "10.0.1.12"
+    conditions:
+      ready: true
+      serving: true
+      terminating: false
+    nodeName: node-3

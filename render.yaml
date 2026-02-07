@@ -1,0 +1,124 @@
+# Render.com Deployment Configuration for TRM Referral Platform
+# This file configures automatic deployment on Render.com
+# For more info: https://render.com/docs/yaml-spec
+#
+# DEPLOYMENT INSTRUCTIONS:
+# 1. Push code to GitHub
+# 2. Create new Web Service on Render, connect this repo
+# 3. Render will read this file automatically
+# 4. Add your MONGODB_URI environment variable in Render dashboard
+# 5. The app will auto-seed with 25 real jobs on first startup
+
+services:
+  # Main Web Service
+  - type: web
+    name: trm-referral-platform
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      # Core Configuration
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: HOST
+        value: 0.0.0.0
+      
+      # Database (MUST be set in Render dashboard)
+      - key: MONGODB_URI
+        sync: false  # User must set this manually in dashboard
+      
+      # JWT Secrets (Auto-generated secure values)
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_EMAIL_SECRET
+        generateValue: true
+      - key: JWT_RESET_SECRET
+        generateValue: true
+      
+      # JWT Expiry Settings
+      - key: JWT_ACCESS_EXPIRY
+        value: 15m
+      - key: JWT_REFRESH_EXPIRY
+        value: 7d
+      
+      # CORS & Frontend URLs (Update after first deploy)
+      - key: CORS_ORIGIN
+        value: https://trm-referral-platform.onrender.com
+      - key: FRONTEND_URL
+        value: https://trm-referral-platform.onrender.com
+      
+      # Rate Limiting
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 900000
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: 100
+      
+      # File Upload
+      - key: MAX_FILE_SIZE
+        value: 10485760
+      - key: UPLOAD_PATH
+        value: ./uploads
+      
+      # Logging
+      - key: LOG_LEVEL
+        value: info
+      
+      # Deployment Flags
+      - key: RENDER_ENVIRONMENT
+        value: true
+      - key: AUTO_SEED_ON_STARTUP
+        value: true
+
+      # Payments (disabled by default for initial deployment)
+      # Enable later by setting *_ENABLED=true and providing merchant credentials.
+      - key: KBZPAY_ENABLED
+        value: false
+      - key: WAVEPAY_ENABLED
+        value: false
+      - key: AYAPAY_ENABLED
+        value: false
+      
+      # Messaging (Mock mode for initial deployment)
+      - key: MESSAGING_MOCK_MODE
+        value: true
+      - key: MESSAGING_DEFAULT_LANGUAGE
+        value: my
+      - key: WHATSAPP_MOCK_MODE
+        value: true
+      
+      # Webhook URLs (Update after first deploy with actual URL)
+      - key: VIBER_WEBHOOK_URL
+        value: https://trm-referral-platform.onrender.com/api/v1/messaging/viber/webhook
+      - key: TELEGRAM_WEBHOOK_URL
+        value: https://trm-referral-platform.onrender.com/api/v1/messaging/telegram/webhook
+      - key: WHATSAPP_WEBHOOK_URL
+        value: https://trm-referral-platform.onrender.com/api/v1/whatsapp/webhook
+    
+    autoDeploy: true
+
+# Note: MongoDB must be provided externally (MongoDB Atlas recommended)
+# Sign up at https://www.mongodb.com/cloud/atlas for free tier
+# Then add MONGODB_URI to environment variables in Render dashboard
+
+# Environment groups for shared configuration (optional)
+envVarGroups:
+  - name: trm-production
+    envVars:
+      - key: LOG_LEVEL
+        value: info
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 900000
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: 100
+      - key: MAX_FILE_SIZE
+        value: 10485760
+      - key: AUTO_SEED_ON_STARTUP
+        value: true

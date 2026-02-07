@@ -1,0 +1,246 @@
+const mongoose = require('mongoose');
+
+const analyticsQuerySchema = new mongoose.Schema({
+  queryId: {
+    type: String,
+    required: true,
+    unique: true,
+    index: true
+  },
+  customerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+    refPath: 'customerType'
+  },
+  customerType: {
+    type: String,
+    enum: ['User', 'Company'],
+    required: true
+  },
+  apiKeyId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'APIKey'
+  },
+  endpoint: {
+    type: String,
+    required: true
+  },
+  queryParams: {
+    type: mongoose.Schema.Types.Mixed,
+    required: true
+  },
+  resultSize: {
+    type: Number,
+    default: 0
+  },
+  executionTime: {
+    type: Number, // in milliseconds
+    required: true
+  },
+  status: {
+    type: String,
+    enum: ['success', 'error', 'timeout', 'rate-limited'],
+    default: 'success'
+  },
+  errorMessage: {
+    type: String
+  },
+  httpStatusCode: {
+    type: Number
+  },
+  creditsUsed: {
+    type: Number,
+    default: 1
+  },
+  cacheHit: {
+    type: Boolean,
+    default: false
+  },
+  ipAddress: {
+    type: String
+  },
+  userAgent: {
+    type: String
+  },
+  requestHeaders: {
+    type: mongoose.Schema.Types.Mixed
+  },
+  responseMetadata: {
+    type: mongoose.Schema.Types.Mixed
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+    index: true
+  }
+});
+
+// Indexes
+analyticsQuerySchema.index({ customerId: 1, customerType: 1 });
+analyticsQuerySchema.index({ endpoint: 1 });
+analyticsQuerySchema.index({ apiKeyId: 1 });
+analyticsQuerySchema.index({ status: 1 });
+analyticsQuerySchema.index({ createdAt: -1 });
+analyticsQuerySchema.index({ createdAt: 1, customerId: 1 }); // For time-based queries
+
+// Static method to get customer query stats
+analyticsQuerySchema.statics.getCustomerStats = async function(customerId, customerType, startDate, endDate) {
+  const matchStage = {
+    customerId: new mongoose.Types.ObjectId(customerId),
+    customerType,
+    createdAt: { $gte: startDate, $lte: endDate }
+  };
+  
+  const stats = await this.aggregate([
+    { $match: matchStage },
+    {
+      $group: {
+        _id: null,
+        totalQueries: { $sum: 1 },
+        avgExecutionTime: { $avg: '$executionTime' },
+        totalCreditsUsed: { $sum: '$creditsUsed' },
+        successCount: {
+          $sum: { $cond: [{ $eq: ['$status', 'success'] }, 1, 0] }
+        },
+        errorCount: {
+          $sum: { $cond: [{ $ne: ['$status', 'success'] }, 1, 0] }
+        },
+        cacheHitCount: {
+          $sum: { $cond: ['$cacheHit', 1, 0] }
+        }
+      }
+    }
+  ]);
+  
+  return stats[0] || {
+    totalQueries: 0,
+    avgExecutionTime: 0,
+    totalCreditsUsed: 0,
+    successCount: 0,
+    errorCount: 0,
+    cacheHitCount: 0
+  };
+};
+
+// Static method to get endpoint usage
+analyticsQuerySchema.statics.getEndpointUsage = async function(startDate, endDate) {
+  return this.aggregate([
+    {
+      $match: {
+        createdAt: { $gte: startDate, $lte: endDate },
+        status: 'success'
+      }
+    },
+    {
+      $group: {
+        _id: '$endpoint',
+        queryCount: { $sum: 1 },
+        avgExecutionTime: { $avg: '$executionTime' },
+        totalCredits: { $sum: '$creditsUsed' },
+        uniqueCustomers: { $addToSet: '$customerId' }
+      }
+    },
+    {
+      $project: {
+        endpoint: '$_id',
+        queryCount: 1,
+        avgExecutionTime: { $round: ['$avgExecutionTime', 2] },
+        totalCredits: 1,
+        uniqueCustomerCount: { $size: '$uniqueCustomers' }
+      }
+    },
+    { $sort: { queryCount: -1 } }
+  ]);
+};
+
+// Static method to get hourly query distribution
+analyticsQuerySchema.statics.getHourlyDistribution = async function(customerId, customerType, date) {
+  const startOfDay = new Date(date);
+  startOfDay.setHours(0, 0, 0, 0);
+  
+  const endOfDay = new Date(date);
+  endOfDay.setHours(23, 59, 59, 999);
+  
+  const matchStage = {
+    createdAt: { $gte: startOfDay, $lte: endOfDay }
+  };
+  
+  if (customerId && customerType) {
+    matchStage.customerId = new mongoose.Types.ObjectId(customerId);
+    matchStage.customerType = customerType;
+  }
+  
+  return this.aggregate([
+    { $match: matchStage },
+    {
+      $group: {
+        _id: { $hour: '$createdAt' },
+        count: { $sum: 1 },
+        avgExecutionTime: { $avg: '$executionTime' }
+      }
+    },
+    { $sort: { _id: 1 } }
+  ]);
+};
+
+// Static method to get error summary
+analyticsQuerySchema.statics.getErrorSummary = async function(startDate, endDate) {
+  return this.aggregate([
+    {
+      $match: {
+        createdAt: { $gte: startDate, $lte: endDate },
+        status: { $ne: 'success' }
+      }
+    },
+    {
+      $group: {
+        _id: '$status',
+        count: { $sum: 1 },
+        endpoints: { $addToSet: '$endpoint' }
+      }
+    },
+    { $sort: { count: -1 } }
+  ]);
+};
+
+// Static method to get usage by time period
+analyticsQuerySchema.statics.getUsageByPeriod = async function(customerId, customerType, period = 'daily', startDate, endDate) {
+  const matchStage = {
+    customerId: new mongoose.Types.ObjectId(customerId),
+    customerType,
+    createdAt: { $gte: startDate, $lte: endDate }
+  };
+  
+  let dateFormat;
+  switch(period) {
+    case 'hourly':
+      dateFormat = { $dateToString: { format: '%Y-%m-%d %H:00', date: '$createdAt' } };
+      break;
+    case 'daily':
+      dateFormat = { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } };
+      break;
+    case 'weekly':
+      dateFormat = { $dateToString: { format: '%Y-W%U', date: '$createdAt' } };
+      break;
+    case 'monthly':
+      dateFormat = { $dateToString: { format: '%Y-%m', date: '$createdAt' } };
+      break;
+    default:
+      dateFormat = { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } };
+  }
+  
+  return this.aggregate([
+    { $match: matchStage },
+    {
+      $group: {
+        _id: dateFormat,
+        queryCount: { $sum: 1 },
+        creditsUsed: { $sum: '$creditsUsed' },
+        avgExecutionTime: { $avg: '$executionTime' }
+      }
+    },
+    { $sort: { _id: 1 } }
+  ]);
+};
+
+module.exports = mongoose.model('AnalyticsQuery', analyticsQuerySchema);

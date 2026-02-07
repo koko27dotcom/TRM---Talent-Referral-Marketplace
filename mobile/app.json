@@ -1,0 +1,90 @@
+{
+  "expo": {
+    "name": "TRM Myanmar Jobs",
+    "slug": "trm-myanmar-jobs",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.trm.myanmarjobs",
+      "infoPlist": {
+        "NSCameraUsageDescription": "TRM needs access to your camera to capture KYC documents.",
+        "NSContactsUsageDescription": "TRM needs access to your contacts to help you refer friends.",
+        "NSFaceIDUsageDescription": "TRM uses Face ID for secure authentication.",
+        "NSUserNotificationUsageDescription": "TRM sends notifications about referral updates and job opportunities."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.trm.myanmarjobs",
+      "permissions": [
+        "CAMERA",
+        "READ_CONTACTS",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "RECEIVE_BOOT_COMPLETED",
+        "SCHEDULE_EXACT_ALARM"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow TRM to access your camera for KYC document upload."
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow TRM to access your contacts for referral sharing."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#ffffff"
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow TRM to use Face ID for authentication."
+        }
+      ]
+    ],
+    "scheme": "trm",
+    "deepLinking": {
+      "enabled": true,
+      "prefixes": [
+        "trm://",
+        "https://trm-myanmar.com"
+      ]
+    },
+    "extra": {
+      "eas": {
+        "projectId": "trm-myanmar-jobs"
+      }
+    },
+    "locales": {
+      "en": "./src/locales/en.json",
+      "my": "./src/locales/my.json"
+    }
+  }
+}

@@ -1,0 +1,2742 @@
+openapi: 3.0.3
+info:
+  title: TRM Referral Platform API
+  description: |
+    # TRM Referral Platform API
+    
+    The TRM (Talent Referral Marketplace) API enables developers to build on the referral platform.
+    Manage job postings, referrals, companies, and receive real-time webhook notifications.
+    
+    ## Base URL
+    - Production: `https://api.trm.com/v1`
+    - Staging: `https://api.staging.trm.com/v1`
+    
+    ## Authentication
+    All API requests require authentication using an API key passed in the `X-API-Key` header.
+    
+    ## Rate Limiting
+    - Standard tier: 100 requests per 15 minutes
+    - Enterprise tier: 1000 requests per 15 minutes
+    
+    ## Myanmar Payment Support
+    The platform supports Myanmar-specific payment methods:
+    - KBZPay
+    - WavePay
+    - CB Pay
+    - Bank Transfers (local Myanmar banks)
+    
+  version: 1.0.0
+  contact:
+    name: TRM API Support
+    email: api-support@trm.com
+    url: https://docs.trm.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.trm.com/v1
+    description: Production server
+  - url: https://api.staging.trm.com/v1
+    description: Staging server
+  - url: http://localhost:5000/api/v1
+    description: Local development
+
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
+
+tags:
+  - name: Authentication
+    description: User registration, login, and token management
+  - name: Jobs
+    description: Job posting management and search
+  - name: Referrals
+    description: Candidate referral workflow management
+  - name: Companies
+    description: Company profile and team management
+  - name: Users
+    description: User profile and statistics
+  - name: Subscriptions
+    description: Subscription plans and billing management
+  - name: Payouts
+    description: Referrer payout requests and processing
+  - name: AI Resume Optimizer
+    description: AI-powered resume optimization using Moonshot AI
+  - name: Admin
+    description: Platform administration endpoints
+  - name: Analytics
+    description: Platform and personal analytics
+  - name: Webhooks
+    description: Webhook configuration and event management
+  - name: Gamification
+    description: Badges, achievements, and points system
+  - name: Notifications
+    description: User notifications and preferences
+
+paths:
+  # ==================== AUTHENTICATION ====================
+  /auth/register:
+    post:
+      summary: Register a new user
+      description: Create a new user account with role-specific profile
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login:
+    post:
+      summary: User login
+      description: Authenticate user and receive access tokens
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh:
+    post:
+      summary: Refresh access token
+      description: Get a new access token using refresh token
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  expiresIn:
+                    type: integer
+
+  /auth/forgot-password:
+    post:
+      summary: Request password reset
+      description: Send password reset email to user
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Password reset email sent
+
+  /auth/reset-password:
+    post:
+      summary: Reset password
+      description: Reset password using token from email
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+                - newPassword
+              properties:
+                token:
+                  type: string
+                newPassword:
+                  type: string
+                  minLength: 8
+      responses:
+        '200':
+          description: Password reset successful
+
+  /auth/logout:
+    post:
+      summary: Logout user
+      description: Invalidate current access token
+      tags:
+        - Authentication
+      responses:
+        '200':
+          description: Logout successful
+
+  /auth/me:
+    get:
+      summary: Get current user
+      description: Retrieve authenticated user's profile
+      tags:
+        - Authentication
+      responses:
+        '200':
+          description: User profile retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  # ==================== JOBS ====================
+  /jobs:
+    get:
+      summary: List jobs
+      description: Retrieve a paginated list of jobs with optional filtering
+      tags:
+        - Jobs
+      security: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, closed, draft]
+        - name: company
+          in: query
+          schema:
+            type: string
+        - name: location
+          in: query
+          schema:
+            type: string
+        - name: jobType
+          in: query
+          schema:
+            type: string
+            enum: [full-time, part-time, contract, internship]
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: salaryMin
+          in: query
+          schema:
+            type: number
+        - name: salaryMax
+          in: query
+          schema:
+            type: number
+        - name: isFeatured
+          in: query
+          schema:
+            type: boolean
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [newest, salary, relevance]
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobListResponse'
+
+    post:
+      summary: Create job
+      description: Create a new job posting (requires jobs:write permission)
+      tags:
+        - Jobs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobCreateRequest'
+      responses:
+        '201':
+          description: Job created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /jobs/featured:
+    get:
+      summary: Get featured jobs
+      description: Retrieve featured job listings
+      tags:
+        - Jobs
+      security: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Successful response
+
+  /jobs/categories:
+    get:
+      summary: Get job categories
+      description: Retrieve all available job categories
+      tags:
+        - Jobs
+      security: []
+      responses:
+        '200':
+          description: Successful response
+
+  /jobs/{id}:
+    get:
+      summary: Get job details
+      description: Retrieve detailed information about a specific job
+      tags:
+        - Jobs
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      summary: Update job
+      description: Update an existing job (requires jobs:write permission)
+      tags:
+        - Jobs
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobUpdateRequest'
+      responses:
+        '200':
+          description: Job updated successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      summary: Delete job
+      description: Delete (close) a job (requires jobs:write permission)
+      tags:
+        - Jobs
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job closed successfully
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /jobs/{id}/status:
+    put:
+      summary: Update job status
+      description: Change job status (active, paused, closed, etc.)
+      tags:
+        - Jobs
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [draft, active, paused, closed, filled]
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Status updated successfully
+
+  /jobs/{id}/apply:
+    post:
+      summary: Apply for job
+      description: Submit direct application for a job
+      tags:
+        - Jobs
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobApplicationRequest'
+      responses:
+        '201':
+          description: Application submitted successfully
+
+  /jobs/{id}/referrals:
+    get:
+      summary: Get job referrals
+      description: Get all referrals for a specific job (company only)
+      tags:
+        - Jobs
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+
+  /jobs/{id}/related:
+    get:
+      summary: Get related jobs
+      description: Get jobs related to a specific job
+      tags:
+        - Jobs
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+
+  # ==================== REFERRALS ====================
+  /referrals:
+    get:
+      summary: List referrals
+      description: Retrieve a list of referrals with optional filtering
+      tags:
+        - Referrals
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [submitted, under_review, shortlisted, interview_scheduled, interview_completed, offer_extended, hired, rejected, withdrawn, paid]
+        - name: job
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  referrals:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Referral'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+    post:
+      summary: Create referral
+      description: Submit a new candidate referral
+      tags:
+        - Referrals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReferralCreateRequest'
+      responses:
+        '201':
+          description: Referral created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  referral:
+                    $ref: '#/components/schemas/Referral'
+                  referralLink:
+                    type: string
+                  code:
+                    type: string
+        '409':
+          description: Duplicate referral
+
+  /referrals/{id}:
+    get:
+      summary: Get referral
+      description: Get detailed information about a referral
+      tags:
+        - Referrals
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Referral'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /referrals/{id}/status:
+    patch:
+      summary: Update referral status
+      description: Update the status of a referral (company/recruiter only)
+      tags:
+        - Referrals
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReferralStatusUpdate'
+      responses:
+        '200':
+          description: Status updated successfully
+
+  /referrals/{id}/tracking:
+    get:
+      summary: Track referral
+      description: Get referral tracking information (public endpoint)
+      tags:
+        - Referrals
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Tracking information retrieved
+
+  /referrals/track/{code}:
+    get:
+      summary: Track referral by code
+      description: Public tracking endpoint for referral status
+      tags:
+        - Referrals
+      security: []
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Tracking information retrieved
+
+  # ==================== COMPANIES ====================
+  /companies:
+    get:
+      summary: List companies
+      description: Retrieve a list of companies with optional filtering
+      tags:
+        - Companies
+      security: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: industry
+          in: query
+          schema:
+            type: string
+        - name: verificationStatus
+          in: query
+          schema:
+            type: string
+            enum: [pending, verified, rejected]
+      responses:
+        '200':
+          description: Successful response
+
+    post:
+      summary: Create company
+      description: Create a new company (requires admin or corporate_admin role)
+      tags:
+        - Companies
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompanyCreateRequest'
+      responses:
+        '201':
+          description: Company created successfully
+
+  /companies/{id}:
+    get:
+      summary: Get company
+      description: Get detailed information about a company
+      tags:
+        - Companies
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Company'
+
+    put:
+      summary: Update company
+      description: Update a company (requires companies:write permission)
+      tags:
+        - Companies
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompanyUpdateRequest'
+      responses:
+        '200':
+          description: Company updated successfully
+
+  /companies/{id}/jobs:
+    get:
+      summary: Get company jobs
+      description: Get all jobs for a specific company
+      tags:
+        - Companies
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+
+  /companies/{id}/team:
+    get:
+      summary: Get company team
+      description: Get all team members for a company
+      tags:
+        - Companies
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+
+    post:
+      summary: Invite team member
+      description: Invite a new team member to the company
+      tags:
+        - Companies
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - role
+              properties:
+                email:
+                  type: string
+                  format: email
+                role:
+                  type: string
+                  enum: [admin, recruiter, viewer]
+                name:
+                  type: string
+      responses:
+        '201':
+          description: Invitation sent successfully
+
+  /companies/{id}/team/{userId}:
+    delete:
+      summary: Remove team member
+      description: Remove a team member from the company
+      tags:
+        - Companies
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Team member removed successfully
+
+  /companies/{id}/billing:
+    get:
+      summary: Get company billing
+      description: Get billing history for a company
+      tags:
+        - Companies
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+
+  /companies/{id}/analytics:
+    get:
+      summary: Get company analytics
+      description: Get analytics data for a company
+      tags:
+        - Companies
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [7d, 30d, 90d, 1y]
+            default: 30d
+      responses:
+        '200':
+          description: Successful response
+
+  /companies/{id}/verify:
+    put:
+      summary: Verify company
+      description: Verify a company (admin only)
+      tags:
+        - Companies
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [verified, rejected]
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: Company verification updated
+
+  # ==================== USERS ====================
+  /users/me:
+    get:
+      summary: Get current user profile
+      description: Get the authenticated user's full profile
+      tags:
+        - Users
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+    put:
+      summary: Update current user
+      description: Update the authenticated user's profile
+      tags:
+        - Users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdateRequest'
+      responses:
+        '200':
+          description: Profile updated successfully
+
+  /users/me/referrals:
+    get:
+      summary: Get my referrals
+      description: Get referrals created by the current user
+      tags:
+        - Users
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Successful response
+
+  /users/me/stats:
+    get:
+      summary: Get my stats
+      description: Get statistics for the current user
+      tags:
+        - Users
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalReferrals:
+                    type: integer
+                  successfulHires:
+                    type: integer
+                  totalEarnings:
+                    type: number
+                  conversionRate:
+                    type: number
+
+  /users/me/kyc:
+    post:
+      summary: Submit KYC
+      description: Submit KYC documents for verification
+      tags:
+        - Users
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - nrcFront
+                - nrcBack
+                - selfie
+              properties:
+                nrcFront:
+                  type: string
+                  format: binary
+                nrcBack:
+                  type: string
+                  format: binary
+                selfie:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: KYC submitted successfully
+
+  /users/{id}:
+    get:
+      summary: Get user by ID
+      description: Get user profile by ID (admin only)
+      tags:
+        - Users
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+
+  # ==================== SUBSCRIPTIONS ====================
+  /subscriptions/tiers:
+    get:
+      summary: Get subscription tiers
+      description: Get all available subscription plans
+      tags:
+        - Subscriptions
+      security: []
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [company, referrer]
+            default: company
+      responses:
+        '200':
+          description: Successful response
+
+  /subscriptions/tiers/{tierId}:
+    get:
+      summary: Get tier details
+      description: Get detailed information about a subscription tier
+      tags:
+        - Subscriptions
+      security: []
+      parameters:
+        - name: tierId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+
+  /subscriptions/my-subscription:
+    get:
+      summary: Get my subscription
+      description: Get current user's active subscription
+      tags:
+        - Subscriptions
+      responses:
+        '200':
+          description: Successful response
+
+  /subscriptions/subscribe:
+    post:
+      summary: Subscribe to plan
+      description: Subscribe to a subscription plan
+      tags:
+        - Subscriptions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - planId
+                - paymentMethod
+              properties:
+                planId:
+                  type: string
+                paymentMethod:
+                  type: string
+                  enum: [kbzpay, wavepay, cbpay, bank_transfer]
+                billingCycle:
+                  type: string
+                  enum: [monthly, yearly]
+                  default: monthly
+      responses:
+        '201':
+          description: Subscription created successfully
+
+  /subscriptions/upgrade:
+    post:
+      summary: Upgrade subscription
+      description: Upgrade to a higher tier plan
+      tags:
+        - Subscriptions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - newPlanId
+              properties:
+                newPlanId:
+                  type: string
+                proration:
+                  type: boolean
+                  default: true
+      responses:
+        '200':
+          description: Subscription upgraded successfully
+
+  /subscriptions/cancel:
+    post:
+      summary: Cancel subscription
+      description: Cancel current subscription
+      tags:
+        - Subscriptions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                immediate:
+                  type: boolean
+                  default: false
+      responses:
+        '200':
+          description: Subscription cancelled successfully
+
+  # ==================== PAYOUTS ====================
+  /payouts:
+    post:
+      summary: Request payout
+      description: Create a new payout request
+      tags:
+        - Payouts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PayoutRequest'
+      responses:
+        '201':
+          description: Payout request created successfully
+
+  /payouts/balance:
+    get:
+      summary: Get balance
+      description: Get current available and pending balance
+      tags:
+        - Payouts
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  availableBalance:
+                    type: number
+                  pendingBalance:
+                    type: number
+                  totalEarnings:
+                    type: number
+                  currency:
+                    type: string
+                    default: MMK
+
+  /payouts/history:
+    get:
+      summary: Get payout history
+      description: Get history of all payout requests
+      tags:
+        - Payouts
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Successful response
+
+  /payouts/payment-methods:
+    get:
+      summary: Get payment methods
+      description: Get saved payment methods
+      tags:
+        - Payouts
+      responses:
+        '200':
+          description: Successful response
+
+    post:
+      summary: Add payment method
+      description: Add a new payment method
+      tags:
+        - Payouts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+              properties:
+                type:
+                  type: string
+                  enum: [kbzpay, wavepay, cbpay, bank_transfer]
+                phoneNumber:
+                  type: string
+                accountName:
+                  type: string
+                bankName:
+                  type: string
+                accountNumber:
+                  type: string
+                accountHolderName:
+                  type: string
+                isDefault:
+                  type: boolean
+      responses:
+        '201':
+          description: Payment method added successfully
+
+  # ==================== AI RESUME OPTIMIZER ====================
+  /ai/resume/optimize:
+    post:
+      summary: Optimize resume
+      description: |
+        Upload and optimize a resume using Moonshot AI (Kimi).
+        Creates a draft referral that must be completed to "unlock" the optimized resume.
+      tags:
+        - AI Resume Optimizer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - resume
+                - jobId
+                - referredPerson
+              properties:
+                resume:
+                  type: string
+                  format: binary
+                  description: PDF resume file (max 10MB)
+                jobId:
+                  type: string
+                  description: Job ID for referral context
+                referredPerson:
+                  type: string
+                  description: JSON string with name, email, phone, currentTitle
+                jobDescription:
+                  type: string
+                  description: Optional custom job description
+      responses:
+        '200':
+          description: Resume optimized successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      originalText:
+                        type: string
+                      optimizedText:
+                        type: string
+                      analysis:
+                        type: object
+                      referralId:
+                        type: string
+                      referralCode:
+                        type: string
+                      creditInfo:
+                        type: object
+        '400':
+          description: Invalid request or missing file
+        '403':
+          description: AI credits exhausted
+
+  /ai/resume/analyze:
+    post:
+      summary: Analyze resume
+      description: Analyze a resume and provide feedback without optimization
+      tags:
+        - AI Resume Optimizer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - resume
+              properties:
+                resume:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Resume analyzed successfully
+
+  /ai/credits:
+    get:
+      summary: Get AI credits
+      description: Get current AI credit balance and usage
+      tags:
+        - AI Resume Optimizer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  usage:
+                    type: integer
+                  limit:
+                    type: integer
+                  bonusCredits:
+                    type: integer
+                  remaining:
+                    type: integer
+
+  # ==================== ADMIN ====================
+  /admin/dashboard:
+    get:
+      summary: Admin dashboard
+      description: Get comprehensive admin dashboard statistics
+      tags:
+        - Admin
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [24h, 7d, 30d, 90d, 1y]
+            default: 30d
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stats:
+                    type: object
+                  charts:
+                    type: object
+
+  /admin/payouts/pending:
+    get:
+      summary: Get pending payouts
+      description: Get list of pending payout requests
+      tags:
+        - Admin
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, all]
+      responses:
+        '200':
+          description: Successful response
+
+  /admin/payouts/process:
+    post:
+      summary: Process payouts
+      description: Batch process payout requests (approve/reject/mark_paid)
+      tags:
+        - Admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - payoutIds
+                - action
+              properties:
+                payoutIds:
+                  type: array
+                  items:
+                    type: string
+                action:
+                  type: string
+                  enum: [approve, reject, mark_paid]
+                paymentInfo:
+                  type: object
+      responses:
+        '200':
+          description: Payouts processed successfully
+
+  /admin/users:
+    get:
+      summary: Get all users
+      description: Get all users with optional filtering (admin only)
+      tags:
+        - Admin
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [referrer, job_seeker, corporate_admin, platform_admin]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, suspended, deleted]
+      responses:
+        '200':
+          description: Successful response
+
+  /admin/users/{id}/status:
+    patch:
+      summary: Update user status
+      description: Suspend or activate a user account
+      tags:
+        - Admin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [active, suspended]
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: User status updated
+
+  /admin/companies:
+    get:
+      summary: Get all companies
+      description: Get all companies with optional filtering
+      tags:
+        - Admin
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: verificationStatus
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+
+  /admin/revenue:
+    get:
+      summary: Get revenue analytics
+      description: Get platform revenue analytics
+      tags:
+        - Admin
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [7d, 30d, 90d, 1y]
+        - name: groupBy
+          in: query
+          schema:
+            type: string
+            enum: [day, month]
+      responses:
+        '200':
+          description: Successful response
+
+  /admin/health:
+    get:
+      summary: System health
+      description: Get system health status
+      tags:
+        - Admin
+      responses:
+        '200':
+          description: Health status retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  database:
+                    type: object
+                  system:
+                    type: object
+
+  # ==================== ANALYTICS ====================
+  /analytics/platform:
+    get:
+      summary: Platform analytics
+      description: Get platform-wide analytics (admin only)
+      tags:
+        - Analytics
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            default: 30d
+      responses:
+        '200':
+          description: Successful response
+
+  /analytics/company/{id}:
+    get:
+      summary: Company analytics
+      description: Get analytics for a specific company
+      tags:
+        - Analytics
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+
+  /analytics/personal:
+    get:
+      summary: Personal analytics
+      description: Get personal analytics for current user
+      tags:
+        - Analytics
+      responses:
+        '200':
+          description: Successful response
+
+  # ==================== GAMIFICATION ====================
+  /gamification/profile:
+    get:
+      summary: Get gamification profile
+      description: Get user's gamification profile including points and level
+      tags:
+        - Gamification
+      responses:
+        '200':
+          description: Successful response
+
+  /gamification/badges:
+    get:
+      summary: Get all badges
+      description: Get list of all available badges
+      tags:
+        - Gamification
+      responses:
+        '200':
+          description: Successful response
+
+  /gamification/my-badges:
+    get:
+      summary: Get my badges
+      description: Get badges earned by current user
+      tags:
+        - Gamification
+      responses:
+        '200':
+          description: Successful response
+
+  /gamification/achievements:
+    get:
+      summary: Get achievements
+      description: Get user's achievements
+      tags:
+        - Gamification
+      responses:
+        '200':
+          description: Successful response
+
+  /gamification/leaderboard:
+    get:
+      summary: Get leaderboard
+      description: Get global leaderboard
+      tags:
+        - Gamification
+      security: []
+      parameters:
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [points, referrals, earnings]
+            default: points
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Successful response
+
+  # ==================== NOTIFICATIONS ====================
+  /notifications:
+    get:
+      summary: Get notifications
+      description: Get user's notifications
+      tags:
+        - Notifications
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Successful response
+
+  /notifications/unread:
+    get:
+      summary: Get unread count
+      description: Get count of unread notifications
+      tags:
+        - Notifications
+      responses:
+        '200':
+          description: Successful response
+
+  /notifications/{id}/read:
+    patch:
+      summary: Mark as read
+      description: Mark a notification as read
+      tags:
+        - Notifications
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Notification marked as read
+
+  /notifications/read-all:
+    patch:
+      summary: Mark all as read
+      description: Mark all notifications as read
+      tags:
+        - Notifications
+      responses:
+        '200':
+          description: All notifications marked as read
+
+  /notifications/preferences:
+    get:
+      summary: Get preferences
+      description: Get notification preferences
+      tags:
+        - Notifications
+      responses:
+        '200':
+          description: Successful response
+
+    put:
+      summary: Update preferences
+      description: Update notification preferences
+      tags:
+        - Notifications
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: boolean
+                inApp:
+                  type: boolean
+                push:
+                  type: boolean
+      responses:
+        '200':
+          description: Preferences updated
+
+  # ==================== WEBHOOKS ====================
+  /webhooks:
+    get:
+      summary: List webhooks
+      description: Get all webhooks for the authenticated user
+      tags:
+        - Webhooks
+      responses:
+        '200':
+          description: Successful response
+
+    post:
+      summary: Create webhook
+      description: Register a new webhook endpoint
+      tags:
+        - Webhooks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookCreateRequest'
+      responses:
+        '201':
+          description: Webhook created successfully
+
+  /webhooks/{id}:
+    get:
+      summary: Get webhook
+      description: Get details of a specific webhook
+      tags:
+        - Webhooks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+
+    put:
+      summary: Update webhook
+      description: Update a webhook configuration
+      tags:
+        - Webhooks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookUpdateRequest'
+      responses:
+        '200':
+          description: Webhook updated successfully
+
+    delete:
+      summary: Delete webhook
+      description: Delete a webhook
+      tags:
+        - Webhooks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Webhook deleted successfully
+
+  /webhooks/{id}/test:
+    post:
+      summary: Test webhook
+      description: Send a test event to a webhook
+      tags:
+        - Webhooks
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Test event sent
+
+  /webhooks/events:
+    get:
+      summary: List webhook events
+      description: Get available webhook event types
+      tags:
+        - Webhooks
+      responses:
+        '200':
+          description: Successful response
+
+  # ==================== API AUTHENTICATION ====================
+  /auth/apikey:
+    post:
+      summary: Create API key
+      description: Generate a new API key for programmatic access
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/APIKeyCreateRequest'
+      responses:
+        '201':
+          description: API key created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:
+                    type: string
+                  id:
+                    type: string
+
+  /auth/apikeys:
+    get:
+      summary: List API keys
+      description: Get all API keys for the authenticated user
+      tags:
+        - Authentication
+      responses:
+        '200':
+          description: Successful response
+
+  /auth/apikeys/{id}:
+    get:
+      summary: Get API key
+      description: Get details of a specific API key
+      tags:
+        - Authentication
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+
+    put:
+      summary: Update API key
+      description: Update an API key
+      tags:
+        - Authentication
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                permissions:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: API key updated successfully
+
+    delete:
+      summary: Revoke API key
+      description: Revoke an API key
+      tags:
+        - Authentication
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: API key revoked successfully
+
+  /auth/apikeys/{id}/rotate:
+    post:
+      summary: Rotate API key
+      description: Generate a new key value for an existing API key
+      tags:
+        - Authentication
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: API key rotated successfully
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key authentication for programmatic access
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token authentication for user sessions
+
+  schemas:
+    # ==================== AUTHENTICATION SCHEMAS ====================
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+        - name
+        - role
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        name:
+          type: string
+        role:
+          type: string
+          enum: [referrer, job_seeker, corporate_admin]
+        phone:
+          type: string
+        companyName:
+          type: string
+        inviteCode:
+          type: string
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            token:
+              type: string
+            refreshToken:
+              type: string
+            expiresIn:
+              type: integer
+
+    # ==================== USER SCHEMAS ====================
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+        avatar:
+          type: string
+        role:
+          type: string
+          enum: [referrer, job_seeker, corporate_admin, platform_admin]
+        status:
+          type: string
+          enum: [active, suspended, deleted]
+        emailVerified:
+          type: boolean
+        referrerProfile:
+          $ref: '#/components/schemas/ReferrerProfile'
+        jobseekerProfile:
+          $ref: '#/components/schemas/JobseekerProfile'
+        createdAt:
+          type: string
+          format: date-time
+
+    ReferrerProfile:
+      type: object
+      properties:
+        referralCode:
+          type: string
+        totalEarnings:
+          type: number
+        availableBalance:
+          type: number
+        pendingBalance:
+          type: number
+        totalReferrals:
+          type: integer
+        successfulHires:
+          type: integer
+        kycStatus:
+          type: string
+          enum: [not_submitted, pending, verified, rejected]
+        tierLevel:
+          type: string
+          enum: [bronze, silver, gold, platinum]
+
+    JobseekerProfile:
+      type: object
+      properties:
+        resume:
+          type: string
+        skills:
+          type: array
+          items:
+            type: string
+        experience:
+          type: string
+        education:
+          type: string
+
+    UserUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        phone:
+          type: string
+        avatar:
+          type: string
+        title:
+          type: string
+        bio:
+          type: string
+
+    # ==================== JOB SCHEMAS ====================
+    Job:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        slug:
+          type: string
+        company:
+          $ref: '#/components/schemas/Company'
+        description:
+          type: string
+        location:
+          $ref: '#/components/schemas/JobLocation'
+        type:
+          type: string
+          enum: [full-time, part-time, contract, internship]
+        salary:
+          $ref: '#/components/schemas/Salary'
+        requirements:
+          type: array
+          items:
+            type: string
+        responsibilities:
+          type: array
+          items:
+            type: string
+        benefits:
+          type: array
+          items:
+            type: string
+        referralBonus:
+          type: number
+        status:
+          type: string
+          enum: [draft, active, paused, closed, filled]
+        isFeatured:
+          type: boolean
+        isUrgent:
+          type: boolean
+        stats:
+          type: object
+          properties:
+            views:
+              type: integer
+            applications:
+              type: integer
+            referrals:
+              type: integer
+            hires:
+              type: integer
+        createdAt:
+          type: string
+          format: date-time
+        publishedAt:
+          type: string
+          format: date-time
+
+    JobLocation:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [onsite, remote, hybrid]
+        city:
+          type: string
+        state:
+          type: string
+        country:
+          type: string
+
+    Salary:
+      type: object
+      properties:
+        min:
+          type: number
+        max:
+          type: number
+        currency:
+          type: string
+          default: MMK
+        period:
+          type: string
+          enum: [monthly, yearly]
+
+    JobCreateRequest:
+      type: object
+      required:
+        - title
+        - description
+        - location
+        - type
+        - referralBonus
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        location:
+          $ref: '#/components/schemas/JobLocation'
+        type:
+          type: string
+          enum: [full-time, part-time, contract, internship]
+        salary:
+          $ref: '#/components/schemas/Salary'
+        requirements:
+          type: array
+          items:
+            type: string
+        responsibilities:
+          type: array
+          items:
+            type: string
+        benefits:
+          type: array
+          items:
+            type: string
+        referralBonus:
+          type: number
+        applicationSettings:
+          type: object
+          properties:
+            requireResume:
+              type: boolean
+            customQuestions:
+              type: array
+              items:
+                type: object
+            deadline:
+              type: string
+              format: date-time
+
+    JobUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        location:
+          $ref: '#/components/schemas/JobLocation'
+        type:
+          type: string
+          enum: [full-time, part-time, contract, internship]
+        salary:
+          $ref: '#/components/schemas/Salary'
+        requirements:
+          type: array
+          items:
+            type: string
+        responsibilities:
+          type: array
+          items:
+            type: string
+        benefits:
+          type: array
+          items:
+            type: string
+        referralBonus:
+          type: number
+        status:
+          type: string
+          enum: [draft, active, paused, closed, filled]
+
+    JobApplicationRequest:
+      type: object
+      required:
+        - fullName
+        - email
+      properties:
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        coverLetter:
+          type: string
+        resume:
+          type: string
+        answers:
+          type: array
+          items:
+            type: object
+
+    JobListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Job'
+        meta:
+          type: object
+          properties:
+            pagination:
+              $ref: '#/components/schemas/Pagination'
+
+    # ==================== COMPANY SCHEMAS ====================
+    Company:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+        logo:
+          type: string
+        website:
+          type: string
+        industry:
+          type: string
+        companySize:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        address:
+          type: object
+          properties:
+            street:
+              type: string
+            city:
+              type: string
+            state:
+              type: string
+            country:
+              type: string
+        verificationStatus:
+          type: string
+          enum: [pending, verified, rejected]
+        currentSubscription:
+          type: object
+          properties:
+            planId:
+              type: string
+            status:
+              type: string
+            expiresAt:
+              type: string
+              format: date-time
+        stats:
+          type: object
+          properties:
+            totalJobsPosted:
+              type: integer
+            totalHires:
+              type: integer
+            totalReferralSpend:
+              type: number
+        createdAt:
+          type: string
+          format: date-time
+
+    CompanyCreateRequest:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        website:
+          type: string
+        industry:
+          type: string
+        companySize:
+          type: string
+        address:
+          type: object
+          properties:
+            street:
+              type: string
+            city:
+              type: string
+            state:
+              type: string
+            country:
+              type: string
+
+    CompanyUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        logo:
+          type: string
+        website:
+          type: string
+        industry:
+          type: string
+        companySize:
+          type: string
+        address:
+          type: object
+
+    # ==================== REFERRAL SCHEMAS ====================
+    Referral:
+      type: object
+      properties:
+        id:
+          type: string
+        code:
+          type: string
+        jobId:
+          type: string
+        job:
+          $ref: '#/components/schemas/Job'
+        referrerId:
+          type: string
+        referredPerson:
+          $ref: '#/components/schemas/ReferredPerson'
+        source:
+          type: object
+          properties:
+            channel:
+              type: string
+            ipAddress:
+              type: string
+            userAgent:
+              type: string
+        status:
+          type: string
+          enum: [submitted, under_review, shortlisted, interview_scheduled, interview_completed, offer_extended, hired, rejected, withdrawn, paid]
+        statusHistory:
+          type: array
+          items:
+            type: object
+            properties:
+              status:
+                type: string
+              changedAt:
+                type: string
+                format: date-time
+              notes:
+                type: string
+        referralBonus:
+          type: number
+        platformCommission:
+          type: number
+        referrerPayout:
+          type: number
+        payout:
+          type: object
+          properties:
+            status:
+              type: string
+            requestedAt:
+              type: string
+              format: date-time
+            paidAt:
+              type: string
+              format: date-time
+        submittedAt:
+          type: string
+          format: date-time
+        hiredAt:
+          type: string
+          format: date-time
+
+    ReferredPerson:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        currentTitle:
+          type: string
+        resumeUrl:
+          type: string
+
+    ReferralCreateRequest:
+      type: object
+      required:
+        - jobId
+        - referredPerson
+      properties:
+        jobId:
+          type: string
+        referredPerson:
+          type: object
+          required:
+            - name
+            - email
+          properties:
+            name:
+              type: string
+            email:
+              type: string
+              format: email
+            phone:
+              type: string
+            currentTitle:
+              type: string
+        notes:
+          type: string
+
+    ReferralStatusUpdate:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [submitted, under_review, shortlisted, interview_scheduled, interview_completed, offer_extended, hired, rejected, withdrawn]
+        notes:
+          type: string
+
+    # ==================== PAYOUT SCHEMAS ====================
+    PayoutRequest:
+      type: object
+      required:
+        - amount
+        - paymentMethod
+      properties:
+        amount:
+          type: number
+          minimum: 1000
+        paymentMethod:
+          type: object
+          required:
+            - type
+          properties:
+            type:
+              type: string
+              enum: [kbzpay, wavepay, cbpay, bank_transfer]
+            phoneNumber:
+              type: string
+            accountName:
+              type: string
+            bankName:
+              type: string
+            accountNumber:
+              type: string
+            accountHolderName:
+              type: string
+        notes:
+          type: string
+        referrals:
+          type: array
+          items:
+            type: string
+
+    # ==================== WEBHOOK SCHEMAS ====================
+    WebhookCreateRequest:
+      type: object
+      required:
+        - name
+        - url
+        - events
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+            enum: [referral.created, referral.status_updated, referral.hired, payout.requested, payout.paid, job.created, job.updated, user.registered]
+        description:
+          type: string
+        secret:
+          type: string
+
+    WebhookUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+        description:
+          type: string
+        isActive:
+          type: boolean
+
+    # ==================== API KEY SCHEMAS ====================
+    APIKeyCreateRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+            enum: [jobs:read, jobs:write, referrals:read, referrals:write, companies:read, companies:write, users:read, users:write, webhooks:read, webhooks:write]
+        environment:
+          type: string
+          enum: [development, production]
+          default: development
+
+    # ==================== COMMON SCHEMAS ====================
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          default: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            type:
+              type: string
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+      headers:
+        X-RateLimit-Limit:
+          description: Request limit per window
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          description: Remaining requests in current window
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          description: Unix timestamp when limit resets
+          schema:
+            type: integer

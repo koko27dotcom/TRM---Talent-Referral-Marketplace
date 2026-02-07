@@ -1,0 +1,424 @@
+# NGINX Ingress Controller Configuration
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  name: nginx-trm
+  labels:
+    app.kubernetes.io/name: nginx
+    app.kubernetes.io/component: ingress-controller
+    app.kubernetes.io/part-of: trm-platform
+  annotations:
+    ingressclass.kubernetes.io/is-default-class: "false"
+spec:
+  controller: k8s.io/ingress-nginx
+---
+# Main TRM Application Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: trm-ingress
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: ingress
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: trm-ingress
+  annotations:
+    # NGINX Ingress Controller
+    kubernetes.io/ingress.class: "nginx-trm"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # TLS Configuration
+    nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2 TLSv1.3"
+    nginx.ingress.kubernetes.io/ssl-ciphers: "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384"
+    nginx.ingress.kubernetes.io/ssl-prefer-server-ciphers: "true"
+    
+    # Rate Limiting
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+    nginx.ingress.kubernetes.io/limit-connections: "5"
+    nginx.ingress.kubernetes.io/limit-rpm: "100"
+    
+    # CORS Configuration
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://trm.io, https://app.trm.io, https://admin.trm.io"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, PUT, POST, DELETE, PATCH, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization,X-API-Key"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    nginx.ingress.kubernetes.io/cors-max-age: "86400"
+    
+    # Proxy Configuration
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-buffering: "on"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "4k"
+    nginx.ingress.kubernetes.io/proxy-buffers: "4 4k"
+    
+    # Security Headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: SAMEORIGIN";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+      more_set_headers "Permissions-Policy: geolocation=(), microphone=(), camera=()";
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains; preload";
+      more_set_headers "Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; media-src 'self'; object-src 'none'; frame-ancestors 'self'; base-uri 'self'; form-action 'self';";
+    
+    # Session Affinity (Sticky Sessions)
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "trm-session"
+    nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-path: "/"
+    nginx.ingress.kubernetes.io/session-cookie-samesite: "Lax"
+    nginx.ingress.kubernetes.io/session-cookie-conditional-samesite-none: "true"
+    
+    # Compression
+    nginx.ingress.kubernetes.io/server-snippet: |
+      gzip on;
+      gzip_vary on;
+      gzip_proxied any;
+      gzip_comp_level 6;
+      gzip_types text/plain text/css text/xml application/json application/javascript application/rss+xml application/atom+xml image/svg+xml;
+    
+    # Certificate Management
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/acme-challenge-type: "http01"
+    
+    # Monitoring
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "10254"
+spec:
+  ingressClassName: nginx-trm
+  tls:
+    - hosts:
+        - trm.io
+        - www.trm.io
+        - api.trm.io
+        - app.trm.io
+        - admin.trm.io
+      secretName: trm-tls-secret
+  rules:
+    # Main Website
+    - host: trm.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: trm-app
+                port:
+                  number: 80
+    
+    # WWW Redirect
+    - host: www.trm.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: trm-app
+                port:
+                  number: 80
+    
+    # API Endpoint
+    - host: api.trm.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: trm-app
+                port:
+                  number: 80
+    
+    # Application Dashboard
+    - host: app.trm.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: trm-app
+                port:
+                  number: 80
+    
+    # Admin Dashboard
+    - host: admin.trm.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: trm-app
+                port:
+                  number: 80
+---
+# API-specific Ingress with stricter rate limiting
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: trm-api-ingress
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: api-ingress
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: trm-api-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx-trm"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    
+    # Stricter rate limiting for API
+    nginx.ingress.kubernetes.io/limit-rps: "50"
+    nginx.ingress.kubernetes.io/limit-connections: "20"
+    nginx.ingress.kubernetes.io/limit-rpm: "1000"
+    
+    # API-specific proxy settings
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
+    
+    # No session affinity for API
+    nginx.ingress.kubernetes.io/affinity: "none"
+    
+    # Whitelist for specific API endpoints
+    nginx.ingress.kubernetes.io/whitelist-source-range: "0.0.0.0/0"
+    
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx-trm
+  tls:
+    - hosts:
+        - api.trm.io
+      secretName: trm-api-tls-secret
+  rules:
+    - host: api.trm.io
+      http:
+        paths:
+          - path: /v1/
+            pathType: Prefix
+            backend:
+              service:
+                name: trm-app
+                port:
+                  number: 80
+          - path: /v2/
+            pathType: Prefix
+            backend:
+              service:
+                name: trm-app
+                port:
+                  number: 80
+          - path: /webhooks/
+            pathType: Prefix
+            backend:
+              service:
+                name: trm-app
+                port:
+                  number: 80
+---
+# WebSocket Ingress for real-time features
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: trm-websocket-ingress
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: websocket-ingress
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: trm-websocket-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx-trm"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    
+    # WebSocket support
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "3600"
+    
+    # WebSocket upgrade headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+    
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx-trm
+  tls:
+    - hosts:
+        - ws.trm.io
+      secretName: trm-ws-tls-secret
+  rules:
+    - host: ws.trm.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: trm-app
+                port:
+                  number: 80
+---
+# Internal/Ingress for monitoring and admin tools
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: trm-internal-ingress
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: internal-ingress
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: trm-internal-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx-trm"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    
+    # Basic Auth for internal tools
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: trm-basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Authentication Required - TRM Internal"
+    
+    # IP Whitelist for internal access
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+    
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx-trm
+  tls:
+    - hosts:
+        - internal.trm.io
+      secretName: trm-internal-tls-secret
+  rules:
+    - host: internal.trm.io
+      http:
+        paths:
+          - path: /metrics
+            pathType: Prefix
+            backend:
+              service:
+                name: trm-app
+                port:
+                  number: 9090
+          - path: /grafana
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 3000
+          - path: /prometheus
+            pathType: Prefix
+            backend:
+              service:
+                name: prometheus
+                port:
+                  number: 9090
+---
+# Secret for basic auth (htpasswd format)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: trm-basic-auth
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: auth
+    app.kubernetes.io/part-of: trm-platform
+type: Opaque
+data:
+  # Generated with: htpasswd -nb admin securepassword | base64
+  auth: "YWRtaW46JGFwcjEkSDY1dnFkNDAkRk5zLmU4QnY5QjJ5M0FzLmZqZVlLLi8="
+---
+# Default Backend for 404 errors
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: trm-default-backend
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: default-backend
+    app.kubernetes.io/part-of: trm-platform
+  annotations:
+    kubernetes.io/ingress.class: "nginx-trm"
+spec:
+  ingressClassName: nginx-trm
+  defaultBackend:
+    service:
+      name: trm-app
+      port:
+        number: 80
+---
+# Certificate resource (if not using cert-manager annotations)
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: trm-tls-certificate
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: certificate
+    app.kubernetes.io/part-of: trm-platform
+spec:
+  secretName: trm-tls-secret
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - trm.io
+    - www.trm.io
+    - api.trm.io
+    - app.trm.io
+    - admin.trm.io
+    - ws.trm.io
+  usages:
+    - digital signature
+    - key encipherment
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 2048
+  duration: 2160h  # 90 days
+  renewBefore: 720h  # 30 days
+---
+# Middleware for Traefik (if using Traefik instead of NGINX)
+# Uncomment if using Traefik Ingress Controller
+# apiVersion: traefik.containo.us/v1alpha1
+# kind: Middleware
+# metadata:
+#   name: trm-rate-limit
+#   namespace: trm
+# spec:
+#   rateLimit:
+#     average: 100
+#     burst: 50
+# ---
+# apiVersion: traefik.containo.us/v1alpha1
+# kind: Middleware
+# metadata:
+#   name: trm-security-headers
+#   namespace: trm
+# spec:
+#   headers:
+#     frameDeny: true
+#     sslRedirect: true
+#     browserXssFilter: true
+#     contentTypeNosniff: true
+#     stsIncludeSubdomains: true
+#     stsPreload: true
+#     stsSeconds: 31536000

@@ -1,0 +1,408 @@
+# Horizontal Pod Autoscaler for TRM Application
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: trm-app-hpa
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: hpa
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: trm-app-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: trm-app
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+    # CPU-based scaling
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    # Memory-based scaling
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+    # Custom metric: Requests per second
+    - type: Pods
+      pods:
+        metric:
+          name: http_requests_per_second
+        target:
+          type: AverageValue
+          averageValue: "1000"
+  behavior:
+    # Scale up quickly
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 4
+          periodSeconds: 15
+      selectPolicy: Max
+    # Scale down slowly to prevent flapping
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+      selectPolicy: Min
+---
+# Horizontal Pod Autoscaler for TRM Workers
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: trm-worker-hpa
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: worker-hpa
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: trm-worker-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: trm-worker
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+    # Custom metric: Queue depth
+    - type: External
+      external:
+        metric:
+          name: redis_queue_depth
+          selector:
+            matchLabels:
+              queue: trm-jobs
+        target:
+          type: AverageValue
+          averageValue: "100"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+        - type: Pods
+          value: 2
+          periodSeconds: 30
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 25
+          periodSeconds: 120
+        - type: Pods
+          value: 1
+          periodSeconds: 120
+      selectPolicy: Min
+---
+# Vertical Pod Autoscaler for TRM Application (recommendations only)
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: trm-app-vpa
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: vpa
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: trm-app-vpa
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: trm-app
+  updatePolicy:
+    updateMode: "Off"  # Set to "Auto" or "Initial" for automatic updates
+  resourcePolicy:
+    containerPolicies:
+      - containerName: trm-app
+        minAllowed:
+          cpu: 250m
+          memory: 512Mi
+        maxAllowed:
+          cpu: 4000m
+          memory: 8Gi
+        controlledResources: ["cpu", "memory"]
+        controlledValues: RequestsAndLimits
+      - containerName: nginx
+        minAllowed:
+          cpu: 25m
+          memory: 32Mi
+        maxAllowed:
+          cpu: 500m
+          memory: 256Mi
+        controlledResources: ["cpu", "memory"]
+---
+# Cluster Autoscaler Priority Expander ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-autoscaler-priority-expander
+  namespace: kube-system
+data:
+  priorities: |-
+    10:
+      - .*spot.*
+    20:
+      - .*ondemand.*
+    30:
+      - .*trm-.*
+---
+# KEDA ScaledObject for event-driven scaling (alternative to HPA)
+# Uncomment if using KEDA
+# apiVersion: keda.sh/v1alpha1
+# kind: ScaledObject
+# metadata:
+#   name: trm-app-keda
+#   namespace: trm
+# spec:
+#   scaleTargetRef:
+#     name: trm-app
+#   pollingInterval: 30
+#   cooldownPeriod: 300
+#   minReplicaCount: 3
+#   maxReplicaCount: 20
+#   triggers:
+#     - type: cpu
+#       metadata:
+#         type: Utilization
+#         value: "70"
+#     - type: memory
+#       metadata:
+#         type: Utilization
+#         value: "80"
+#     - type: prometheus
+#       metadata:
+#         serverAddress: http://prometheus.monitoring.svc:9090
+#         metricName: http_requests_total
+#         threshold: "1000"
+#         query: sum(rate(http_requests_total{service="trm-app"}[2m]))
+---
+# PodDisruptionBudget for HPA-managed pods
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: trm-app-hpa-pdb
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: hpa-pdb
+    app.kubernetes.io/part-of: trm-platform
+spec:
+  minAvailable: 50%
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: trm
+      app.kubernetes.io/component: app
+---
+# Custom Metrics API Service (for custom metrics scaling)
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  name: v1beta1.custom.metrics.k8s.io
+  labels:
+    app.kubernetes.io/name: custom-metrics-apiserver
+    app.kubernetes.io/component: metrics-api
+spec:
+  service:
+    name: custom-metrics-apiserver
+    namespace: monitoring
+  group: custom.metrics.k8s.io
+  version: v1beta1
+  insecureSkipTLSVerify: true
+  groupPriorityMinimum: 100
+  versionPriority: 100
+---
+# External Metrics API Service
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  name: v1beta1.external.metrics.k8s.io
+  labels:
+    app.kubernetes.io/name: external-metrics-apiserver
+    app.kubernetes.io/component: metrics-api
+spec:
+  service:
+    name: external-metrics-apiserver
+    namespace: monitoring
+  group: external.metrics.k8s.io
+  version: v1beta1
+  insecureSkipTLSVerify: true
+  groupPriorityMinimum: 100
+  versionPriority: 100
+---
+# Prometheus Adapter ConfigMap for custom metrics
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-adapter-config
+  namespace: monitoring
+data:
+  config.yaml: |
+    rules:
+      - seriesQuery: 'http_requests_total{namespace!="",pod!=""}'
+        resources:
+          overrides:
+            namespace:
+              resource: namespace
+            pod:
+              resource: pod
+        name:
+          matches: "^(.*)_total"
+          as: "${1}_per_second"
+        metricsQuery: 'sum(rate(<<.Series>>{<<.LabelMatchers>>}[2m])) by (<<.GroupBy>>)'
+      
+      - seriesQuery: 'redis_queue_depth{namespace!="",pod!=""}'
+        resources:
+          overrides:
+            namespace:
+              resource: namespace
+            pod:
+              resource: pod
+        name:
+          matches: "^(.*)"
+          as: "${1}"
+        metricsQuery: '<<.Series>>{<<.LabelMatchers>>}'
+---
+# Cron-based scaling (scale up during business hours)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: trm-scale-up-morning
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: scheduled-scaling
+    app.kubernetes.io/part-of: trm-platform
+spec:
+  schedule: "0 8 * * 1-5"  # 8 AM, Monday-Friday
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: trm-scaler-sa
+          restartPolicy: OnFailure
+          containers:
+            - name: kubectl
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  kubectl patch hpa trm-app-hpa -n trm --type='merge' -p '{"spec":{"minReplicas":5}}'
+                  echo "Scaled up TRM app to minimum 5 replicas"
+              resources:
+                requests:
+                  cpu: "50m"
+                  memory: "64Mi"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: trm-scale-down-evening
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: scheduled-scaling
+    app.kubernetes.io/part-of: trm-platform
+spec:
+  schedule: "0 20 * * 1-5"  # 8 PM, Monday-Friday
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: trm-scaler-sa
+          restartPolicy: OnFailure
+          containers:
+            - name: kubectl
+              image: bitnami/kubectl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  kubectl patch hpa trm-app-hpa -n trm --type='merge' -p '{"spec":{"minReplicas":3}}'
+                  echo "Scaled down TRM app to minimum 3 replicas"
+              resources:
+                requests:
+                  cpu: "50m"
+                  memory: "64Mi"
+---
+# ServiceAccount for scaling operations
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: trm-scaler-sa
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: scaler
+    app.kubernetes.io/part-of: trm-platform
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: trm-scaler-role
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: scaler
+    app.kubernetes.io/part-of: trm-platform
+rules:
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "patch", "update"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: trm-scaler-rolebinding
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: scaler
+    app.kubernetes.io/part-of: trm-platform
+subjects:
+  - kind: ServiceAccount
+    name: trm-scaler-sa
+    namespace: trm
+roleRef:
+  kind: Role
+  name: trm-scaler-role
+  apiGroup: rbac.authorization.k8s.io

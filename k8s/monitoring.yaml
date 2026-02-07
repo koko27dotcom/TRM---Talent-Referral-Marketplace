@@ -1,0 +1,753 @@
+# ServiceMonitor for TRM Application
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: trm-app-metrics
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: trm-app-metrics
+    prometheus: kube-prometheus
+spec:
+  namespaceSelector:
+    matchNames:
+      - trm
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: trm
+      app.kubernetes.io/component: app
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      honorLabels: true
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'trm_.*'
+          action: keep
+---
+# ServiceMonitor for MongoDB
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mongodb-metrics
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: mongodb
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: mongodb-metrics
+    prometheus: kube-prometheus
+spec:
+  namespaceSelector:
+    matchNames:
+      - trm
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mongodb
+      app.kubernetes.io/component: database
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+---
+# ServiceMonitor for Redis
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis-metrics
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: redis-metrics
+    prometheus: kube-prometheus
+spec:
+  namespaceSelector:
+    matchNames:
+      - trm
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+      app.kubernetes.io/component: cache
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+---
+# PrometheusRule for TRM Alerts
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: trm-alerts
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: alerts
+    app.kubernetes.io/part-of: trm-platform
+    app.kubernetes.io/instance: trm-alerts
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: trm-application
+      rules:
+        # High Error Rate Alert
+        - alert: TRMHighErrorRate
+          expr: |
+            (
+              sum(rate(http_requests_total{namespace="trm",service="trm-app",status=~"5.."}[5m]))
+              /
+              sum(rate(http_requests_total{namespace="trm",service="trm-app"}[5m]))
+            ) > 0.05
+          for: 5m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "TRM Application High Error Rate"
+            description: "Error rate is above 5% for {{ $labels.service }}"
+            runbook_url: "https://wiki.internal/runbooks/trm-high-error-rate"
+        
+        # High Latency Alert
+        - alert: TRMHighLatency
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(http_request_duration_seconds_bucket{namespace="trm",service="trm-app"}[5m])) by (le)
+            ) > 2
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "TRM Application High Latency"
+            description: "95th percentile latency is above 2 seconds"
+        
+        # Pod Crash Looping
+        - alert: TRMPodCrashLooping
+          expr: |
+            rate(kube_pod_container_status_restarts_total{namespace="trm",container="trm-app"}[10m]) > 0
+          for: 5m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "TRM Pod Crash Looping"
+            description: "Pod {{ $labels.pod }} is crash looping"
+        
+        # High Memory Usage
+        - alert: TRMHighMemoryUsage
+          expr: |
+            (
+              container_memory_working_set_bytes{namespace="trm",container="trm-app"}
+              /
+              container_spec_memory_limit_bytes{namespace="trm",container="trm-app"}
+            ) > 0.85
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "TRM High Memory Usage"
+            description: "Memory usage is above 85% for pod {{ $labels.pod }}"
+        
+        # High CPU Usage
+        - alert: TRMHighCPUUsage
+          expr: |
+            (
+              rate(container_cpu_usage_seconds_total{namespace="trm",container="trm-app"}[5m])
+              /
+              container_spec_cpu_quota{namespace="trm",container="trm-app"}
+            ) > 0.8
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "TRM High CPU Usage"
+            description: "CPU usage is above 80% for pod {{ $labels.pod }}"
+        
+        # Pod Not Ready
+        - alert: TRMPodNotReady
+          expr: |
+            kube_pod_status_ready{namespace="trm",condition="true",pod=~"trm-app-.*"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "TRM Pod Not Ready"
+            description: "Pod {{ $labels.pod }} has been not ready for more than 5 minutes"
+        
+        # HPA Maxed Out
+        - alert: TRMHPAAtMax
+          expr: |
+            kube_horizontalpodautoscaler_status_current_replicas{namespace="trm",horizontalpodautoscaler="trm-app-hpa"}
+            ==
+            kube_horizontalpodautoscaler_spec_max_replicas{namespace="trm",horizontalpodautoscaler="trm-app-hpa"}
+          for: 15m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "TRM HPA at Maximum Replicas"
+            description: "HPA has been at maximum replicas for 15 minutes"
+        
+        # Database Connection Issues
+        - alert: TRMDatabaseConnectionErrors
+          expr: |
+            rate(trm_database_connection_errors_total{namespace="trm"}[5m]) > 0
+          for: 2m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "TRM Database Connection Errors"
+            description: "Database connection errors detected"
+        
+        # Queue Depth High
+        - alert: TRMQueueDepthHigh
+          expr: |
+            redis_queue_depth{namespace="trm",queue="trm-jobs"} > 1000
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "TRM Queue Depth High"
+            description: "Queue depth is above 1000 messages"
+        
+        # SSL Certificate Expiry
+        - alert: TRMSSLCertificateExpiring
+          expr: |
+            (certmanager_certificate_expiration_timestamp_seconds{namespace="trm"} - time()) / 86400 < 30
+          for: 1h
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "TRM SSL Certificate Expiring Soon"
+            description: "SSL certificate expires in less than 30 days"
+    
+    - name: mongodb
+      rules:
+        # MongoDB High Connections
+        - alert: MongoDBHighConnections
+          expr: |
+            mongodb_connections{namespace="trm",state="current"} > 400
+          for: 5m
+          labels:
+            severity: warning
+            team: database
+          annotations:
+            summary: "MongoDB High Connection Count"
+            description: "MongoDB has more than 400 connections"
+        
+        # MongoDB Replication Lag
+        - alert: MongoDBReplicationLag
+          expr: |
+            mongodb_mongod_replset_member_replication_lag{namespace="trm"} > 10
+          for: 5m
+          labels:
+            severity: critical
+            team: database
+          annotations:
+            summary: "MongoDB Replication Lag"
+            description: "MongoDB replication lag is above 10 seconds"
+        
+        # MongoDB Storage Full
+        - alert: MongoDBStorageFull
+          expr: |
+            (
+              mongodb_dbstats_dataSize{namespace="trm"}
+              /
+              mongongodb_dbstats_storageSize{namespace="trm"}
+            ) > 0.85
+          for: 5m
+          labels:
+            severity: critical
+            team: database
+          annotations:
+            summary: "MongoDB Storage Nearly Full"
+            description: "MongoDB storage is above 85% capacity"
+    
+    - name: redis
+      rules:
+        # Redis Memory High
+        - alert: RedisMemoryHigh
+          expr: |
+            (
+              redis_memory_used_bytes{namespace="trm"}
+              /
+              redis_memory_max_bytes{namespace="trm"}
+            ) > 0.8
+          for: 5m
+          labels:
+            severity: warning
+            team: cache
+          annotations:
+            summary: "Redis Memory Usage High"
+            description: "Redis memory usage is above 80%"
+        
+        # Redis Connections High
+        - alert: RedisConnectionsHigh
+          expr: |
+            redis_connected_clients{namespace="trm"} > 800
+          for: 5m
+          labels:
+            severity: warning
+            team: cache
+          annotations:
+            summary: "Redis Connection Count High"
+            description: "Redis has more than 800 connected clients"
+---
+# Grafana Dashboard ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trm-grafana-dashboards
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/component: dashboards
+    app.kubernetes.io/part-of: trm-platform
+    grafana_dashboard: "1"
+data:
+  trm-overview.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "TRM Platform Overview",
+        "tags": ["trm", "overview"],
+        "timezone": "Asia/Rangoon",
+        "schemaVersion": 36,
+        "refresh": "30s",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Request Rate",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{namespace=\"trm\"}[5m]))",
+                "legendFormat": "Requests/sec"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Error Rate",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{namespace=\"trm\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{namespace=\"trm\"}[5m]))",
+                "legendFormat": "Error %"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "P95 Latency",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace=\"trm\"}[5m])) by (le))",
+                "legendFormat": "P95 Latency"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0}
+          },
+          {
+            "id": 4,
+            "title": "Active Pods",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "count(kube_pod_status_ready{namespace=\"trm\",condition=\"true\"})",
+                "legendFormat": "Pods"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0}
+          },
+          {
+            "id": 5,
+            "title": "Request Rate Over Time",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{namespace=\"trm\"}[5m])) by (status)",
+                "legendFormat": "{{status}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "id": 6,
+            "title": "Response Time Distribution",
+            "type": "heatmap",
+            "targets": [
+              {
+                "expr": "sum(rate(http_request_duration_seconds_bucket{namespace=\"trm\"}[5m])) by (le)"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          },
+          {
+            "id": 7,
+            "title": "CPU Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"trm\",container=\"trm-app\"}[5m])) by (pod)",
+                "legendFormat": "{{pod}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+          },
+          {
+            "id": 8,
+            "title": "Memory Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(container_memory_working_set_bytes{namespace=\"trm\",container=\"trm-app\"}) by (pod)",
+                "legendFormat": "{{pod}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+          }
+        ]
+      }
+    }
+  
+  trm-mongodb.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "TRM MongoDB Metrics",
+        "tags": ["trm", "mongodb", "database"],
+        "timezone": "Asia/Rangoon",
+        "schemaVersion": 36,
+        "refresh": "30s",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Connections",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "mongodb_connections{namespace=\"trm\"}",
+                "legendFormat": "{{state}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Opcounters",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(mongodb_op_latencies_ops_total{namespace=\"trm\"}[5m])",
+                "legendFormat": "{{type}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 16, "x": 8, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Replication Lag",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "mongodb_mongod_replset_member_replication_lag{namespace=\"trm\"}",
+                "legendFormat": "{{member}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "id": 4,
+            "title": "Storage Size",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "mongodb_dbstats_storageSize{namespace=\"trm\"}",
+                "legendFormat": "{{db}}"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+          }
+        ]
+      }
+    }
+  
+  trm-redis.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "TRM Redis Metrics",
+        "tags": ["trm", "redis", "cache"],
+        "timezone": "Asia/Rangoon",
+        "schemaVersion": 36,
+        "refresh": "30s",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Memory Usage",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "redis_memory_used_bytes{namespace=\"trm\"} / redis_memory_max_bytes{namespace=\"trm\"} * 100",
+                "legendFormat": "Memory %"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Connected Clients",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "redis_connected_clients{namespace=\"trm\"}",
+                "legendFormat": "Clients"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Commands/sec",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "rate(redis_commands_processed_total{namespace=\"trm\"}[5m])",
+                "legendFormat": "Commands/sec"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0}
+          },
+          {
+            "id": 4,
+            "title": "Keyspace Hits/Misses",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(redis_keyspace_hits_total{namespace=\"trm\"}[5m])",
+                "legendFormat": "Hits"
+              },
+              {
+                "expr": "rate(redis_keyspace_misses_total{namespace=\"trm\"}[5m])",
+                "legendFormat": "Misses"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          }
+        ]
+      }
+    }
+---
+# Alertmanager Configuration
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-trm-config
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: config
+    app.kubernetes.io/part-of: trm-platform
+type: Opaque
+stringData:
+  alertmanager.yml: |
+    global:
+      smtp_smarthost: 'smtp.gmail.com:587'
+      smtp_from: 'alerts@trm.io'
+      smtp_auth_username: 'alerts@trm.io'
+      smtp_auth_password: 'your-smtp-password'
+      slack_api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+      pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+      resolve_timeout: 5m
+    
+    templates:
+      - '/etc/alertmanager/templates/*.tmpl'
+    
+    route:
+      receiver: 'default'
+      group_by: ['alertname', 'cluster', 'service']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      routes:
+        - match:
+            severity: critical
+          receiver: 'pagerduty-critical'
+          continue: true
+        - match:
+            severity: warning
+          receiver: 'slack-warnings'
+          continue: true
+        - match:
+            team: platform
+          receiver: 'platform-team'
+        - match:
+            team: database
+          receiver: 'database-team'
+    
+    receivers:
+      - name: 'default'
+        email_configs:
+          - to: 'platform-team@trm.io'
+            send_resolved: true
+      
+      - name: 'pagerduty-critical'
+        pagerduty_configs:
+          - service_key: '<YOUR_PAGERDUTY_KEY>'
+            severity: critical
+            description: '{{ .GroupLabels.alertname }}: {{ .GroupLabels.service }}'
+      
+      - name: 'slack-warnings'
+        slack_configs:
+          - channel: '#platform-alerts'
+            send_resolved: true
+            title: '{{ .GroupLabels.alertname }}'
+            text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+      
+      - name: 'platform-team'
+        email_configs:
+          - to: 'platform-team@trm.io'
+            send_resolved: true
+      
+      - name: 'database-team'
+        email_configs:
+          - to: 'database-team@trm.io'
+            send_resolved: true
+    
+    inhibit_rules:
+      - source_match:
+          severity: 'critical'
+        target_match:
+          severity: 'warning'
+        equal: ['alertname', 'cluster', 'service']
+---
+# Loki ConfigMap for log aggregation
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki-config
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: loki
+    app.kubernetes.io/component: config
+    app.kubernetes.io/part-of: trm-platform
+data:
+  loki.yaml: |
+    auth_enabled: false
+    
+    server:
+      http_listen_port: 3100
+    
+    common:
+      path_prefix: /loki
+      storage:
+        filesystem:
+          chunks_directory: /loki/chunks
+          rules_directory: /loki/rules
+      replication_factor: 1
+      ring:
+        instance_addr: 127.0.0.1
+        kvstore:
+          store: inmemory
+    
+    schema_config:
+      configs:
+        - from: 2020-10-24
+          store: boltdb-shipper
+          object_store: filesystem
+          schema: v11
+          index:
+            prefix: index_
+            period: 24h
+    
+    ruler:
+      alertmanager_url: http://alertmanager:9093
+    
+    analytics:
+      reporting_enabled: false
+---
+# Promtail ConfigMap for log collection
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: promtail-config
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: promtail
+    app.kubernetes.io/component: config
+    app.kubernetes.io/part-of: trm-platform
+data:
+  promtail.yaml: |
+    server:
+      http_listen_port: 9080
+      grpc_listen_port: 0
+    
+    positions:
+      filename: /tmp/positions.yaml
+    
+    clients:
+      - url: http://loki:3100/loki/api/v1/push
+    
+    scrape_configs:
+      - job_name: kubernetes-pods
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - trm
+        pipeline_stages:
+          - docker: {}
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+            target_label: app
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_pod_container_name]
+            target_label: container
+---
+# Network Policy for monitoring
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: network-policy
+    app.kubernetes.io/part-of: trm-platform
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: trm
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090
+        - protocol: TCP
+          port: 3000

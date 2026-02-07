@@ -1,0 +1,146 @@
+# TRM Referral Platform Load Testing Configuration
+# Artillery.io configuration for load testing
+
+config:
+  target: '{{ $processEnvironment.API_URL || "http://localhost:3000" }}'
+  phases:
+    # Warm-up phase
+    - duration: 60
+      arrivalRate: 5
+      name: Warm up
+    
+    # Ramp up phase
+    - duration: 120
+      arrivalRate: 5
+      rampTo: 50
+      name: Ramp up load
+    
+    # Sustained load phase
+    - duration: 300
+      arrivalRate: 50
+      name: Sustained load
+    
+    # Spike test phase
+    - duration: 60
+      arrivalRate: 100
+      name: Spike test
+    
+    # Cool down phase
+    - duration: 60
+      arrivalRate: 10
+      name: Cool down
+
+  defaults:
+    headers:
+      Content-Type: application/json
+
+  plugins:
+    expect: {}
+    metrics-by-endpoint: {}
+
+scenarios:
+  # Authentication flow
+  - name: Authentication Flow
+    weight: 20
+    flow:
+      - post:
+          url: /api/auth/login
+          json:
+            email: loadtest@example.com
+            password: LoadTest123!
+          capture:
+            - json: $.data.tokens.accessToken
+              as: authToken
+          expect:
+            - statusCode: 200
+            - contentType: json
+            - hasProperty: data.tokens.accessToken
+
+  # Referral creation flow
+  - name: Create Referral
+    weight: 30
+    flow:
+      - post:
+          url: /api/auth/login
+          json:
+            email: loadtest@example.com
+            password: LoadTest123!
+          capture:
+            - json: $.data.tokens.accessToken
+              as: authToken
+      - post:
+          url: /api/referrals
+          headers:
+            Authorization: 'Bearer {{ authToken }}'
+          json:
+            jobId: '{{ $randomString() }}'
+            candidateName: 'Load Test Candidate'
+            candidateEmail: 'candidate{{ $randomNumber(1, 10000) }}@example.com'
+            candidatePhone: '+959{{ $randomNumber(100000000, 999999999) }}'
+          expect:
+            - statusCode: 201
+
+  # Browse jobs flow
+  - name: Browse Jobs
+    weight: 25
+    flow:
+      - get:
+          url: /api/jobs?page=1&limit=20
+          expect:
+            - statusCode: 200
+            - contentType: json
+      - think: 2
+      - get:
+          url: /api/jobs?page=2&limit=20
+          expect:
+            - statusCode: 200
+
+  # Dashboard analytics flow
+  - name: Dashboard Analytics
+    weight: 15
+    flow:
+      - post:
+          url: /api/auth/login
+          json:
+            email: loadtest@example.com
+            password: LoadTest123!
+          capture:
+            - json: $.data.tokens.accessToken
+              as: authToken
+      - get:
+          url: /api/referrals/stats
+          headers:
+            Authorization: 'Bearer {{ authToken }}'
+          expect:
+            - statusCode: 200
+      - get:
+          url: /api/payments/balance
+          headers:
+            Authorization: 'Bearer {{ authToken }}'
+          expect:
+            - statusCode: 200
+
+  # Payment flow
+  - name: Payment Operations
+    weight: 10
+    flow:
+      - post:
+          url: /api/auth/login
+          json:
+            email: loadtest@example.com
+            password: LoadTest123!
+          capture:
+            - json: $.data.tokens.accessToken
+              as: authToken
+      - get:
+          url: /api/payments/transactions?page=1&limit=10
+          headers:
+            Authorization: 'Bearer {{ authToken }}'
+          expect:
+            - statusCode: 200
+      - get:
+          url: /api/payments/methods
+          headers:
+            Authorization: 'Bearer {{ authToken }}'
+          expect:
+            - statusCode: 200

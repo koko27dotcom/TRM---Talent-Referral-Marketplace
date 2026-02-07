@@ -1,0 +1,14 @@
+# Query: MyanJobs
+# ContextLines: 1
+
+2 results - 2 files
+
+src/sections/JobDetail.tsx:
+  92      const shareData = {
+  93:       title: `${jobTitle} - Mya`,
+  94        text: `Check out this ${jobTitle} position! Use my referral code ${referralCode} to apply and earn rewards.`,
+
+src/sections/Navigation.tsx:
+  40              <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+  41:               MyanJobs
+  42              </span>
