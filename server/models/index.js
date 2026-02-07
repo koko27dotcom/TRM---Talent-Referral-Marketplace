@@ -19,12 +19,22 @@ const RevenueAnalytics = require('./RevenueAnalytics.js');
 const AuditLog = require('./AuditLog.js');
 const ReferralNetwork = require('./ReferralNetwork.js');
 const TierBenefits = require('./TierBenefits.js');
+
 const WhatsAppTemplate = require('./WhatsAppTemplate.js');
 const { TEMPLATE_TYPE, TEMPLATE_STATUS, TEMPLATE_CATEGORY } = require('./WhatsAppTemplate.js');
+
 const WhatsAppSession = require('./WhatsAppSession.js');
+// ✅ FIX: these were exported but not imported in your file
 const { SESSION_STATUS, CONTEXT_TYPE, USER_TYPE } = require('./WhatsAppSession.js');
+
 const WhatsAppMessage = require('./WhatsAppMessage.js');
 const { MESSAGE_DIRECTION, MESSAGE_TYPE, MESSAGE_STATUS, INTERACTIVE_TYPE } = require('./WhatsAppMessage.js');
+
+// ✅ FIX: you export AnalyticsSession but it wasn’t imported
+const AnalyticsSession = require('./AnalyticsSession.js');
+// ✅ FIX: alias to avoid redeclare of SESSION_STATUS
+const { SESSION_STATUS: ANALYTICS_SESSION_STATUS, TRAFFIC_SOURCES } = require('./AnalyticsSession.js');
+
 const LeadScore = require('./LeadScore.js');
 const ReferrerQuality = require('./ReferrerQuality.js');
 const EmailCampaign = require('./EmailCampaign.js');
@@ -41,11 +51,14 @@ const FeaturedJobSlot = require('./FeaturedJobSlot.js');
 const EnterprisePlan = require('./EnterprisePlan.js');
 const KYCStatus = require('./KYCStatus.js');
 const KYCDocument = require('./KYCDocument.js');
+
 const Notification = require('./Notification.js');
 const { NOTIFICATION_TYPES, NOTIFICATION_PRIORITY, NOTIFICATION_CHANNELS } = require('./Notification.js');
+
 const PayoutBatch = require('./PayoutBatch.js');
 const PayoutProvider = require('./PayoutProvider.js');
 const PayoutTransaction = require('./PayoutTransaction.js');
+
 // Payment models POSTPONED - focus on core referral functionality
 // const PaymentTransaction = require('./PaymentTransaction.js');
 // const PaymentMethod = require('./PaymentMethod.js');
@@ -54,8 +67,6 @@ const PayoutTransaction = require('./PayoutTransaction.js');
 const AnalyticsInsight = require('./AnalyticsInsight.js');
 const AnalyticsEvent = require('./AnalyticsEvent.js');
 const { EVENT_TYPES, EVENT_CATEGORIES, DEVICE_TYPES, PLATFORMS } = require('./AnalyticsEvent.js');
-const AnalyticsSession = require('./AnalyticsSession.js');
-const { SESSION_STATUS: ANALYTICS_SESSION_STATUS, TRAFFIC_SOURCES } = require('./AnalyticsSession.js');
 const SalaryBenchmark = require('./SalaryBenchmark.js');
 const MarketTrend = require('./MarketTrend.js');
 const HiringVelocity = require('./HiringVelocity.js');
@@ -107,9 +118,11 @@ module.exports = {
   Subscription,
   BillingRecord,
   PayoutRequest,
+
   PayoutBatch,
   PayoutProvider,
   PayoutTransaction,
+
   // Payment models POSTPONED - focus on core referral functionality
   // PaymentTransaction,
   // PaymentMethod,
@@ -119,23 +132,28 @@ module.exports = {
   // TRANSACTION_STATUS,
   // TRANSACTION_TYPE,
   // PAYMENT_PROVIDER,
+
   RevenueAnalytics,
   AuditLog,
   ReferralNetwork,
   TierBenefits,
+
   WhatsAppTemplate,
   TEMPLATE_TYPE,
   TEMPLATE_STATUS,
   TEMPLATE_CATEGORY,
+
   WhatsAppSession,
   SESSION_STATUS,
   CONTEXT_TYPE,
   USER_TYPE,
+
   WhatsAppMessage,
   MESSAGE_DIRECTION,
   MESSAGE_TYPE,
   MESSAGE_STATUS,
   INTERACTIVE_TYPE,
+
   LeadScore,
   ReferrerQuality,
   EmailCampaign,
@@ -152,10 +170,12 @@ module.exports = {
   EnterprisePlan,
   KYCStatus,
   KYCDocument,
+
   Notification,
   NOTIFICATION_TYPES,
   NOTIFICATION_PRIORITY,
   NOTIFICATION_CHANNELS,
+
   // AI Analytics Models
   AnalyticsInsight,
   AnalyticsEvent,
@@ -163,21 +183,26 @@ module.exports = {
   EVENT_CATEGORIES,
   DEVICE_TYPES,
   PLATFORMS,
+
   AnalyticsSession,
   ANALYTICS_SESSION_STATUS,
   TRAFFIC_SOURCES,
+
   SalaryBenchmark,
   MarketTrend,
   HiringVelocity,
   ReferrerPrediction,
+
   // Internationalization Models
   Localization,
   RegionConfig,
   CurrencyRate,
+
   // Talent Sourcing Models (Phase 4)
   TalentPool,
   CandidateSource,
   OutreachCampaign,
+
   // Gamification Models (Phase 4)
   GamificationProfile,
   Badge,
@@ -185,6 +210,7 @@ module.exports = {
   LeaderboardEntry,
   Challenge,
   UserActivity,
+
   // Community & Social Platform Models (Phase 4)
   CommunityPost,
   Comment,
@@ -194,6 +220,7 @@ module.exports = {
   Content,
   PublicProfile,
   Review,
+
   // Referral Academy Models
   AcademyCourse,
   CONTENT_TYPE,
