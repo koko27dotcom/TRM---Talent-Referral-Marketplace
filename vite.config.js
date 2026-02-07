@@ -30,15 +30,8 @@ export default defineConfig({
     // Generate source maps for production error tracking (Sentry)
     sourcemap: process.env.NODE_ENV === 'production' ? 'hidden' : true,
     
-    // Minification
-   minify: 'esbuild',
-    terserOptions: {
-      compress: {
-        drop_console: process.env.NODE_ENV === 'production',
-        drop_debugger: true,
-        pure_funcs: process.env.NODE_ENV === 'production' ? ['console.log', 'console.debug'] : [],
-      },
-    },
+    // Minification (esbuild is default and fastest - no extra dependency needed)
+    minify: 'esbuild',
     
     // Asset optimization
     assetsInlineLimit: 4096, // Inline assets < 4KB as base64
