@@ -467,5 +467,4 @@ router.get('/dashboard', requireRole('platform_admin'), async (req, res) => {
 });
 
 module.exports = router;
-</parameter name="new_string">
 </invoke>
