@@ -365,7 +365,8 @@ app.use(express.static(distPath, {
 
 // Catch-all route to serve React app for client-side routing
 // This must be AFTER all API routes but BEFORE error handlers
-app.get('/*', (req, res, next) => {
+app.get(/^\/(?!api).*/, (req, res, next) => {
+>>>>>>> d852e813 (fix: spa catch-all route)
   console.log(`🔍 [DIAGNOSTIC] Catch-all route hit: ${req.method} ${req.originalUrl}`);
   console.log(`🔍 [DIAGNOSTIC] distPath: ${distPath}`);
   console.log(`🔍 [DIAGNOSTIC] distExists: ${distExists}`);
