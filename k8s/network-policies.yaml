@@ -1,0 +1,218 @@
+# =============================================================================
+# TRM Platform - Kubernetes Network Policies
+# Zero-trust network security: deny all, allow only what's needed
+# Following Google BeyondProd and AWS security best practices
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Default Deny All Ingress and Egress
+# This is the foundation of zero-trust networking
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+# -----------------------------------------------------------------------------
+# 2. Allow DNS Resolution (required for all pods)
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# -----------------------------------------------------------------------------
+# 3. TRM App Network Policy
+# Allow: ingress from ingress controller, egress to MongoDB, Redis, external APIs
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: trm-app-policy
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: trm
+      app.kubernetes.io/component: app
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from ingress controller (Nginx/Istio)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: istio-system
+      ports:
+        - protocol: TCP
+          port: 3000
+    # Allow from Prometheus for metrics scraping
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090
+        - protocol: TCP
+          port: 3000
+    # Allow health checks from kubelet
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 3000
+  egress:
+    # Allow to MongoDB
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mongodb
+      ports:
+        - protocol: TCP
+          port: 27017
+    # Allow to Redis
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    # Allow HTTPS to external services (Stripe, SendGrid, AWS, etc.)
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 587  # SMTP
+
+---
+# -----------------------------------------------------------------------------
+# 4. MongoDB Network Policy
+# Allow: ingress only from TRM app pods
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mongodb-policy
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: mongodb
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mongodb
+      app.kubernetes.io/component: database
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from TRM app pods only
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: trm
+              app.kubernetes.io/component: app
+      ports:
+        - protocol: TCP
+          port: 27017
+    # Allow MongoDB replica set communication
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mongodb
+      ports:
+        - protocol: TCP
+          port: 27017
+    # Allow from Prometheus for metrics
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9216
+  egress:
+    # Allow MongoDB replica set communication
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mongodb
+      ports:
+        - protocol: TCP
+          port: 27017
+
+---
+# -----------------------------------------------------------------------------
+# 5. Redis Network Policy
+# Allow: ingress only from TRM app pods
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-policy
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+      app.kubernetes.io/component: cache
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from TRM app pods only
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: trm
+              app.kubernetes.io/component: app
+      ports:
+        - protocol: TCP
+          port: 6379
+    # Allow from Prometheus for metrics
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9121
+  egress: []  # Redis doesn't need outbound access

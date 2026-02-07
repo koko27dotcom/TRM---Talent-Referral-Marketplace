@@ -43,7 +43,15 @@
     "db:indexes:health": "node -e \"require('./server/services/databaseIndexService.js').getHealthReport().then(console.log)\"",
     "db:indexes:verify": "node -e \"require('./server/services/databaseIndexService.js').verifyIndexes().then(console.log)\"",
     "monitor:queries:slow": "node -e \"console.log(require('./server/services/queryOptimizationService.js').getSlowQueries(10))\"",
-    "monitor:queries:stats": "node -e \"console.log(require('./server/services/queryOptimizationService.js').getStats())\""
+    "monitor:queries:stats": "node -e \"console.log(require('./server/services/queryOptimizationService.js').getStats())\"",
+    "migrate:up": "migrate-mongo up -f server/migrations/migrate-mongo-config.js",
+    "migrate:down": "migrate-mongo down -f server/migrations/migrate-mongo-config.js",
+    "migrate:status": "migrate-mongo status -f server/migrations/migrate-mongo-config.js",
+    "migrate:create": "migrate-mongo create -f server/migrations/migrate-mongo-config.js",
+    "backup:create": "bash scripts/backup/mongodb-backup.sh",
+    "backup:restore": "bash scripts/disaster-recovery/mongodb-restore.sh",
+    "backup:list": "bash scripts/disaster-recovery/mongodb-restore.sh --list",
+    "health:check": "curl -s http://localhost:3000/health/deep | node -e \"process.stdin.resume(); process.stdin.on('data', d => { const h = JSON.parse(d); console.log(JSON.stringify(h, null, 2)); process.exit(h.status === 'healthy' ? 0 : 1); })\""
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.6",

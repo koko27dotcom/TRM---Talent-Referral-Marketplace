@@ -92,6 +92,13 @@ setupUnhandledRejectionHandler();
 
 // ==================== MIDDLEWARE ====================
 
+// Prometheus metrics collection (must be first middleware)
+const { metricsMiddleware, metricsEndpoint } = require('./middleware/prometheusMetrics.js');
+app.use(metricsMiddleware());
+
+// Prometheus metrics endpoint (separate port or path)
+app.get('/metrics', metricsEndpoint());
+
 // CORS configuration
 const corsOptions = {
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
@@ -107,29 +114,58 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Request logging middleware
+// Structured request logging with correlation IDs
 app.use((req, res, next) => {
+  const crypto = require('crypto');
   const timestamp = new Date().toISOString();
   const method = req.method;
   const url = req.originalUrl;
   const ip = req.ip || req.connection.remoteAddress;
   
-  console.log(`[${timestamp}] ${method} ${url} - ${ip}`);
-  
-  // Add request ID for tracing
-  req.requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  // Generate unique request ID (or use forwarded one from load balancer)
+  req.requestId = req.headers['x-request-id'] || `${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
   res.setHeader('X-Request-Id', req.requestId);
+  
+  // Structured JSON log for production log aggregation (ELK/Loki)
+  if (process.env.LOG_FORMAT === 'json') {
+    console.log(JSON.stringify({
+      level: 'info',
+      type: 'request',
+      requestId: req.requestId,
+      method,
+      url,
+      ip,
+      userAgent: req.headers['user-agent'],
+      timestamp,
+    }));
+  } else {
+    console.log(`[${timestamp}] ${method} ${url} - ${ip} [${req.requestId}]`);
+  }
   
   next();
 });
 
-// Response time middleware
+// Response time middleware with structured logging
 app.use((req, res, next) => {
   const start = Date.now();
   
   res.on('finish', () => {
     const duration = Date.now() - start;
-    console.log(`[${req.requestId}] Response: ${res.statusCode} - ${duration}ms`);
+    if (process.env.LOG_FORMAT === 'json') {
+      console.log(JSON.stringify({
+        level: res.statusCode >= 400 ? 'warn' : 'info',
+        type: 'response',
+        requestId: req.requestId,
+        method: req.method,
+        url: req.originalUrl,
+        statusCode: res.statusCode,
+        duration,
+        contentLength: res.getHeader('content-length'),
+        timestamp: new Date().toISOString(),
+      }));
+    } else {
+      console.log(`[${req.requestId}] Response: ${res.statusCode} - ${duration}ms`);
+    }
   });
   
   next();
@@ -137,18 +173,11 @@ app.use((req, res, next) => {
 
 // ==================== HEALTH CHECK ====================
 
-// Basic health check for Railway
-app.get('/health', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Server is running',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
-    version: process.env.npm_package_version || '1.0.0',
-  });
-});
+// Comprehensive health check routes (deep, ready, live, metrics)
+const healthRoutes = require('./routes/health.js');
+app.use('/health', healthRoutes);
 
-// Detailed health check with database status
+// Basic health check for Railway/Render (backward compatible)
 app.get('/api/health', async (req, res) => {
   try {
     const { isDatabaseConnected, getConnectionStats } = require('./config/database.js');
@@ -481,54 +510,79 @@ const startServer = async () => {
       console.log('='.repeat(60));
     });
     
-    // Graceful shutdown - FIXED WITH SAFETY CHECKS
+    // Graceful shutdown - Production-grade with connection draining
+    let isShuttingDown = false;
+    const SHUTDOWN_TIMEOUT = parseInt(process.env.SHUTDOWN_TIMEOUT) || 30000;
+
     const gracefulShutdown = async (signal) => {
-      console.log(`\n${signal} received. Starting graceful shutdown...`);
+      if (isShuttingDown) {
+        console.log(`${signal} received again during shutdown. Forcing exit.`);
+        process.exit(1);
+      }
+      isShuttingDown = true;
+
+      const shutdownLog = (msg) => {
+        if (process.env.LOG_FORMAT === 'json') {
+          console.log(JSON.stringify({ level: 'info', type: 'shutdown', message: msg, signal, timestamp: new Date().toISOString() }));
+        } else {
+          console.log(`[Shutdown] ${msg}`);
+        }
+      };
+
+      shutdownLog(`${signal} received. Starting graceful shutdown...`);
+
+      // 1. Stop accepting new connections (K8s will stop sending traffic after readiness probe fails)
+      shutdownLog('Stopping new connections...');
       
       try {
-        // Stop workflow cron jobs
+        // 2. Stop cron jobs
+        shutdownLog('Stopping cron jobs...');
         stopWorkflowCron();
-
-        // Stop revenue analytics cron jobs
         stopRevenueCron();
-
-        // Stop payout processing cron jobs
         stopPayoutCron();
-        
-        // Stop leaderboard/gamification cron jobs - FIXED WITH SAFETY CHECK
         if (leaderboardCron && typeof leaderboardCron.stop === 'function') {
           leaderboardCron.stop();
         }
-        
-        // Stop analytics cron jobs (Phase 4) - FIXED WITH SAFETY CHECK
         if (analyticsCron && typeof analyticsCron.stop === 'function') {
           analyticsCron.stop();
         }
+        shutdownLog('Cron jobs stopped');
       } catch (cronError) {
         console.error('Error stopping cron jobs:', cronError);
       }
       
-      // Close HTTP server
+      // 3. Close HTTP server (drain existing connections)
       server.close(async () => {
-        console.log('HTTP server closed');
+        shutdownLog('HTTP server closed - all connections drained');
         
         try {
-          // Disconnect from database
+          // 4. Close Redis connections
+          try {
+            const redis = require('./config/redis.js');
+            if (redis && typeof redis.quit === 'function') {
+              await redis.quit();
+              shutdownLog('Redis disconnected');
+            }
+          } catch (redisError) {
+            // Redis may not be configured
+          }
+
+          // 5. Disconnect from database
           await disconnectDatabase();
-          console.log('Database disconnected');
+          shutdownLog('Database disconnected');
         } catch (dbError) {
-          console.error('Error disconnecting from database:', dbError);
+          console.error('Error during cleanup:', dbError);
         }
         
-        console.log('Graceful shutdown complete');
+        shutdownLog('Graceful shutdown complete');
         process.exit(0);
       });
       
-      // Force shutdown after 30 seconds
+      // Force shutdown after timeout
       setTimeout(() => {
-        console.error('Forced shutdown due to timeout');
+        console.error(`Forced shutdown after ${SHUTDOWN_TIMEOUT}ms timeout`);
         process.exit(1);
-      }, 30000);
+      }, SHUTDOWN_TIMEOUT).unref(); // .unref() so timer doesn't keep process alive
     };
     
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

@@ -1,0 +1,221 @@
+# =============================================================================
+# TRM Platform - SLA/SLO Monitoring Configuration
+# Following Google SRE principles for Service Level Objectives
+# =============================================================================
+
+# SLO Definitions:
+# - Availability: 99.9% (43.8 min downtime/month)
+# - Latency: p95 < 500ms, p99 < 1000ms
+# - Error Rate: < 0.1% of requests return 5xx
+# - Throughput: Support 1000 req/s sustained
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: trm-slo-rules
+  namespace: trm
+  labels:
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: slo
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    # =========================================================================
+    # SLO Recording Rules (pre-compute for dashboards)
+    # =========================================================================
+    - name: trm-slo-recording
+      interval: 30s
+      rules:
+        # Availability SLI: ratio of successful requests
+        - record: trm:sli:availability
+          expr: |
+            sum(rate(http_requests_total{namespace="trm",status!~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{namespace="trm"}[5m]))
+
+        # Latency SLI: ratio of requests under 500ms
+        - record: trm:sli:latency
+          expr: |
+            sum(rate(http_request_duration_seconds_bucket{namespace="trm",le="0.5"}[5m]))
+            /
+            sum(rate(http_request_duration_seconds_count{namespace="trm"}[5m]))
+
+        # Error budget remaining (30-day window)
+        - record: trm:slo:error_budget_remaining
+          expr: |
+            1 - (
+              (1 - trm:sli:availability)
+              /
+              (1 - 0.999)
+            )
+
+        # Burn rate (how fast we're consuming error budget)
+        - record: trm:slo:burn_rate_1h
+          expr: |
+            (1 - trm:sli:availability)
+            /
+            (1 - 0.999)
+
+        # Request rate
+        - record: trm:sli:request_rate
+          expr: |
+            sum(rate(http_requests_total{namespace="trm"}[5m]))
+
+        # p95 latency
+        - record: trm:sli:latency_p95
+          expr: |
+            histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace="trm"}[5m])) by (le))
+
+        # p99 latency
+        - record: trm:sli:latency_p99
+          expr: |
+            histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{namespace="trm"}[5m])) by (le))
+
+    # =========================================================================
+    # SLO Alerting Rules (multi-window, multi-burn-rate)
+    # Following Google SRE alerting strategy
+    # =========================================================================
+    - name: trm-slo-alerts
+      rules:
+        # ----- Availability SLO: 99.9% -----
+
+        # Fast burn: 14.4x burn rate over 1h (pages immediately)
+        - alert: TRMAvailabilitySLOFastBurn
+          expr: |
+            (
+              (1 - (sum(rate(http_requests_total{namespace="trm",status!~"5.."}[1h])) / sum(rate(http_requests_total{namespace="trm"}[1h]))))
+              /
+              (1 - 0.999)
+            ) > 14.4
+            and
+            (
+              (1 - (sum(rate(http_requests_total{namespace="trm",status!~"5.."}[5m])) / sum(rate(http_requests_total{namespace="trm"}[5m]))))
+              /
+              (1 - 0.999)
+            ) > 14.4
+          for: 2m
+          labels:
+            severity: critical
+            slo: availability
+            team: platform
+          annotations:
+            summary: "TRM availability SLO fast burn rate exceeded"
+            description: "Error budget is being consumed 14.4x faster than allowed. Current availability: {{ $value | humanizePercentage }}"
+            runbook_url: "https://docs.trm.io/runbooks/availability-slo"
+            dashboard_url: "https://grafana.trm.io/d/trm-slo"
+
+        # Slow burn: 6x burn rate over 6h (tickets)
+        - alert: TRMAvailabilitySLOSlowBurn
+          expr: |
+            (
+              (1 - (sum(rate(http_requests_total{namespace="trm",status!~"5.."}[6h])) / sum(rate(http_requests_total{namespace="trm"}[6h]))))
+              /
+              (1 - 0.999)
+            ) > 6
+            and
+            (
+              (1 - (sum(rate(http_requests_total{namespace="trm",status!~"5.."}[30m])) / sum(rate(http_requests_total{namespace="trm"}[30m]))))
+              /
+              (1 - 0.999)
+            ) > 6
+          for: 15m
+          labels:
+            severity: warning
+            slo: availability
+            team: platform
+          annotations:
+            summary: "TRM availability SLO slow burn rate exceeded"
+            description: "Error budget is being consumed 6x faster than allowed over 6h window"
+
+        # ----- Latency SLO: p95 < 500ms -----
+
+        # Fast burn: p95 latency exceeding SLO
+        - alert: TRMLatencySLOFastBurn
+          expr: |
+            histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace="trm"}[1h])) by (le)) > 0.5
+            and
+            histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace="trm"}[5m])) by (le)) > 0.5
+          for: 2m
+          labels:
+            severity: critical
+            slo: latency
+            team: platform
+          annotations:
+            summary: "TRM latency SLO breached - p95 > 500ms"
+            description: "p95 latency is {{ $value | humanizeDuration }} (SLO: 500ms)"
+
+        # Slow burn: p99 latency exceeding SLO
+        - alert: TRMLatencySLOSlowBurn
+          expr: |
+            histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{namespace="trm"}[6h])) by (le)) > 1.0
+          for: 15m
+          labels:
+            severity: warning
+            slo: latency
+            team: platform
+          annotations:
+            summary: "TRM latency SLO slow burn - p99 > 1000ms"
+            description: "p99 latency is {{ $value | humanizeDuration }} over 6h (SLO: 1000ms)"
+
+        # ----- Error Budget Alerts -----
+
+        # Error budget < 25% remaining
+        - alert: TRMErrorBudgetLow
+          expr: trm:slo:error_budget_remaining < 0.25
+          for: 5m
+          labels:
+            severity: warning
+            slo: error-budget
+            team: platform
+          annotations:
+            summary: "TRM error budget below 25%"
+            description: "Only {{ $value | humanizePercentage }} of monthly error budget remaining"
+
+        # Error budget exhausted
+        - alert: TRMErrorBudgetExhausted
+          expr: trm:slo:error_budget_remaining < 0
+          for: 1m
+          labels:
+            severity: critical
+            slo: error-budget
+            team: platform
+          annotations:
+            summary: "TRM error budget exhausted!"
+            description: "Monthly error budget is exhausted. Consider freezing deployments."
+
+        # ----- Infrastructure Alerts -----
+
+        # High pod restart rate
+        - alert: TRMHighPodRestartRate
+          expr: |
+            increase(kube_pod_container_status_restarts_total{namespace="trm"}[1h]) > 5
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "TRM pod {{ $labels.pod }} restarting frequently"
+            description: "Pod {{ $labels.pod }} has restarted {{ $value }} times in the last hour"
+
+        # Database connection pool exhaustion
+        - alert: TRMDatabaseConnectionPoolHigh
+          expr: |
+            mongodb_connections{namespace="trm",state="current"} / mongodb_connections{namespace="trm",state="available"} > 0.8
+          for: 5m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "MongoDB connection pool > 80% utilized"
+
+        # Redis memory usage high
+        - alert: TRMRedisMemoryHigh
+          expr: |
+            redis_memory_used_bytes{namespace="trm"} / redis_memory_max_bytes{namespace="trm"} > 0.85
+          for: 10m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "Redis memory usage > 85%"

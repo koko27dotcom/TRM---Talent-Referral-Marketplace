@@ -68,8 +68,8 @@ COPY --from=build /app/dist ./dist
 COPY --chmod=755 server ./server
 COPY server.cjs ./
 
-# Copy environment file (will be overridden by docker-compose)
-COPY .env.example ./.env
+# Copy environment template (will be overridden by docker-compose or K8s secrets)
+COPY .env.example ./.env 2>/dev/null || true
 
 # Create uploads directory and set permissions
 RUN mkdir -p uploads && chown -R nodejs:nodejs /app

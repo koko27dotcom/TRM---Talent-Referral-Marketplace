@@ -1,0 +1,164 @@
+# =============================================================================
+# TRM Platform - Grafana Dashboard ConfigMap
+# Pre-built dashboards for application, database, and infrastructure monitoring
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trm-grafana-dashboards
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+    app.kubernetes.io/name: trm
+    app.kubernetes.io/component: dashboards
+data:
+  trm-overview.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "uid": "trm-overview",
+        "title": "TRM Platform - Overview",
+        "tags": ["trm", "overview"],
+        "timezone": "Asia/Rangoon",
+        "refresh": "10s",
+        "time": { "from": "now-1h", "to": "now" },
+        "panels": [
+          {
+            "id": 1,
+            "title": "Request Rate (req/s)",
+            "type": "timeseries",
+            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{namespace='trm'}[5m]))",
+                "legendFormat": "Total Requests/s"
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Error Rate (%)",
+            "type": "gauge",
+            "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 },
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{namespace='trm',status=~'5..'}[5m])) / sum(rate(http_requests_total{namespace='trm'}[5m])) * 100",
+                "legendFormat": "Error Rate %"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "thresholds": {
+                  "steps": [
+                    { "color": "green", "value": 0 },
+                    { "color": "yellow", "value": 1 },
+                    { "color": "red", "value": 5 }
+                  ]
+                },
+                "max": 100,
+                "unit": "percent"
+              }
+            }
+          },
+          {
+            "id": 3,
+            "title": "Response Time (p95)",
+            "type": "gauge",
+            "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 },
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace='trm'}[5m])) by (le)) * 1000",
+                "legendFormat": "p95 Latency (ms)"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "thresholds": {
+                  "steps": [
+                    { "color": "green", "value": 0 },
+                    { "color": "yellow", "value": 300 },
+                    { "color": "red", "value": 500 }
+                  ]
+                },
+                "max": 1000,
+                "unit": "ms"
+              }
+            }
+          },
+          {
+            "id": 4,
+            "title": "Active Pods",
+            "type": "stat",
+            "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
+            "targets": [
+              {
+                "expr": "count(kube_pod_status_phase{namespace='trm',phase='Running'})",
+                "legendFormat": "Running Pods"
+              }
+            ]
+          },
+          {
+            "id": 5,
+            "title": "CPU Usage",
+            "type": "timeseries",
+            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+            "targets": [
+              {
+                "expr": "sum(rate(container_cpu_usage_seconds_total{namespace='trm',container!=''}[5m])) by (pod)",
+                "legendFormat": "{{pod}}"
+              }
+            ]
+          },
+          {
+            "id": 6,
+            "title": "Memory Usage",
+            "type": "timeseries",
+            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+            "targets": [
+              {
+                "expr": "sum(container_memory_working_set_bytes{namespace='trm',container!=''}) by (pod) / 1024 / 1024",
+                "legendFormat": "{{pod}} (MB)"
+              }
+            ]
+          },
+          {
+            "id": 7,
+            "title": "MongoDB Connections",
+            "type": "timeseries",
+            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+            "targets": [
+              {
+                "expr": "mongodb_connections{namespace='trm'}",
+                "legendFormat": "{{state}}"
+              }
+            ]
+          },
+          {
+            "id": 8,
+            "title": "Redis Hit Rate",
+            "type": "gauge",
+            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+            "targets": [
+              {
+                "expr": "redis_keyspace_hits_total / (redis_keyspace_hits_total + redis_keyspace_misses_total) * 100",
+                "legendFormat": "Cache Hit Rate %"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "thresholds": {
+                  "steps": [
+                    { "color": "red", "value": 0 },
+                    { "color": "yellow", "value": 70 },
+                    { "color": "green", "value": 90 }
+                  ]
+                },
+                "max": 100,
+                "unit": "percent"
+              }
+            }
+          }
+        ]
+      }
+    }

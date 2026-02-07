@@ -1,0 +1,36 @@
+# =============================================================================
+# TRM Platform - Production Terraform Variables
+# Copy to production.tfvars and fill in actual values
+# NEVER commit production.tfvars to version control
+# =============================================================================
+
+aws_region   = "ap-southeast-1"
+environment  = "production"
+
+# VPC
+vpc_cidr             = "10.0.0.0/16"
+private_subnet_cidrs = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+public_subnet_cidrs  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+
+# EKS Node Groups
+node_instance_types = ["m6i.xlarge", "m5.xlarge"]
+node_desired_size   = 3
+node_min_size       = 2
+node_max_size       = 10
+
+# Spot Instances (cost optimization)
+spot_desired_size = 2
+spot_min_size     = 1
+spot_max_size     = 5
+
+# DocumentDB (MongoDB-compatible)
+enable_documentdb    = true
+docdb_instance_class = "db.r6g.large"
+docdb_instance_count = 3
+docdb_username       = "trm_admin"
+docdb_password       = "CHANGE_ME_TO_SECURE_PASSWORD"
+
+# ElastiCache (Redis)
+redis_node_type          = "cache.r6g.large"
+redis_num_cache_clusters = 3
+redis_auth_token         = "CHANGE_ME_TO_SECURE_TOKEN"
