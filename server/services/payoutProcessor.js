@@ -373,9 +373,9 @@ registerProvider(providerConfig) {
     instance: providerInstance,
     config: providerConfig,
   });
+
+  console.log(`[PayoutProcessor] Registered provider: ${providerConfig.code}`);
 }
-    console.log(`[PayoutProcessor] Registered provider: ${providerConfig.code}`);
-  }
 
   /**
    * Get provider instance
