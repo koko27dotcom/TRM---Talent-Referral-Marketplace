@@ -31,7 +31,7 @@ export default defineConfig({
     sourcemap: process.env.NODE_ENV === 'production' ? 'hidden' : true,
     
     // Minification
-    minify: 'terser',
+   minify: 'esbuild',
     terserOptions: {
       compress: {
         drop_console: process.env.NODE_ENV === 'production',
