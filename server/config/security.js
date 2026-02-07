@@ -693,5 +693,3 @@ module.exports = {
     return directives.join('; ');
   },
 };
-</parameter name="new_string">
-</invoke>

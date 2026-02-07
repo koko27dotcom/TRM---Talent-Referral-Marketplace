@@ -620,5 +620,3 @@ module.exports = {
   validateQuery,
   sanitizeRequestBody,
 };
-</parameter name="new_string">
-</invoke>

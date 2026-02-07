@@ -470,5 +470,3 @@ module.exports = {
   getCookiePolicyUrl,
   getRequiredCookieConsents,
 };
-</parameter name="new_string">
-</invoke>

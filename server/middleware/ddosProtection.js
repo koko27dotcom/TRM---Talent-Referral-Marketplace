@@ -483,5 +483,3 @@ module.exports = {
   generateChallenge,
   verifySolution,
 };
-</parameter name="new_string">
-</invoke>
