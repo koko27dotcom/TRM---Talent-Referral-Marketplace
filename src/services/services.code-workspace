@@ -1,0 +1,28 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../sections"
+		},
+		{
+			"path": "../pages"
+		},
+		{
+			"path": "../lib"
+		},
+		{
+			"path": "../i18n"
+		},
+		{
+			"path": "../hooks"
+		},
+		{
+			"path": "../contexts"
+		},
+		{
+			"path": "../components"
+		}
+	]
+}

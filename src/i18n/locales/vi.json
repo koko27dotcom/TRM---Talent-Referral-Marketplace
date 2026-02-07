@@ -1,0 +1,92 @@
+{
+  "common": {
+    "appName": "TRM",
+    "loading": "[VI] Loading...",
+    "error": "[VI] An error occurred",
+    "save": "[VI] Save",
+    "cancel": "[VI] Cancel",
+    "delete": "[VI] Delete",
+    "edit": "[VI] Edit",
+    "create": "[VI] Create",
+    "search": "[VI] Search",
+    "submit": "[VI] Submit",
+    "close": "[VI] Close",
+    "back": "[VI] Back",
+    "next": "[VI] Next",
+    "confirm": "[VI] Confirm",
+    "success": "[VI] Success",
+    "warning": "[VI] Warning",
+    "info": "[VI] Information"
+  },
+  "auth": {
+    "login": {
+      "title": "[VI] Sign In",
+      "email": "[VI] Email Address",
+      "password": "[VI] Password",
+      "submit": "[VI] Sign In",
+      "forgotPassword": "[VI] Forgot Password?",
+      "noAccount": "[VI] Don't have an account?",
+      "register": "[VI] Sign Up"
+    },
+    "register": {
+      "title": "[VI] Create Account",
+      "name": "[VI] Full Name",
+      "email": "[VI] Email Address",
+      "password": "[VI] Password",
+      "confirmPassword": "[VI] Confirm Password",
+      "submit": "[VI] Create Account",
+      "hasAccount": "[VI] Already have an account?",
+      "login": "[VI] Sign In"
+    }
+  },
+  "navigation": {
+    "home": "[VI] Home",
+    "jobs": "[VI] Jobs",
+    "referrals": "[VI] Referrals",
+    "payouts": "[VI] Payouts",
+    "profile": "[VI] Profile",
+    "settings": "[VI] Settings",
+    "logout": "[VI] Logout",
+    "dashboard": "[VI] Dashboard",
+    "admin": "[VI] Admin"
+  },
+  "jobs": {
+    "title": "[VI] Jobs",
+    "searchPlaceholder": "[VI] Search jobs...",
+    "filter": "[VI] Filter",
+    "location": "[VI] Location",
+    "salary": "[VI] Salary",
+    "type": "[VI] Job Type",
+    "apply": "[VI] Apply Now",
+    "refer": "[VI] Refer Friend",
+    "posted": "[VI] Posted {{date}}",
+    "deadline": "[VI] Deadline: {{date}}"
+  },
+  "referrals": {
+    "title": "[VI] My Referrals",
+    "makeReferral": "[VI] Make a Referral",
+    "status": {
+      "pending": "[VI] Pending",
+      "contacted": "[VI] Contacted",
+      "interviewing": "[VI] Interviewing",
+      "hired": "[VI] Hired",
+      "rejected": "[VI] Rejected"
+    },
+    "reward": "[VI] Reward: {{amount}}"
+  },
+  "payouts": {
+    "title": "[VI] Payouts",
+    "available": "[VI] Available Balance",
+    "pending": "[VI] Pending",
+    "total": "[VI] Total Earned",
+    "request": "[VI] Request Payout",
+    "history": "[VI] Payout History"
+  },
+  "validation": {
+    "required": "[VI] This field is required",
+    "email": "[VI] Please enter a valid email",
+    "minLength": "[VI] Must be at least {{count}} characters",
+    "maxLength": "[VI] Must be at most {{count}} characters",
+    "passwordMatch": "[VI] Passwords do not match"
+  }
+}

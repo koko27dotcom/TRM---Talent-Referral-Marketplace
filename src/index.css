@@ -1,0 +1,213 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  body {
+    @apply antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+  
+  /* Mobile-first touch optimizations */
+  * {
+    @apply touch-manipulation;
+  }
+  
+  /* Prevent text selection on UI elements */
+  button, a, [role="button"] {
+    @apply select-none;
+  }
+  
+  /* Smooth scrolling for iOS */
+  html {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@layer components {
+  /* Mobile-optimized container */
+  .container-mobile {
+    @apply px-4 sm:px-6 lg:px-8;
+  }
+  
+  /* Touch-friendly button sizes */
+  .btn-touch {
+    @apply min-h-[48px] min-w-[48px] px-6 py-3;
+  }
+  
+  /* Card hover effects - disabled on mobile */
+  .card-hover {
+    @apply transition-all duration-300;
+  }
+  
+  @media (hover: hover) {
+    .card-hover:hover {
+      @apply -translate-y-1 shadow-xl;
+    }
+  }
+  
+  /* Mobile-optimized form inputs */
+  .input-mobile {
+    @apply text-base; /* Prevents iOS zoom on focus */
+    @apply h-12 px-4;
+  }
+  
+  /* Safe area insets for notched phones */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  
+  /* Bottom sheet animation */
+  .bottom-sheet {
+    @apply fixed inset-x-0 bottom-0 bg-white rounded-t-3xl shadow-2xl;
+    @apply transform transition-transform duration-300 ease-out;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  
+  /* Pull-to-refresh indicator */
+  .pull-indicator {
+    @apply absolute top-0 left-0 right-0 h-16 flex items-center justify-center;
+    @apply text-slate-400 text-sm;
+    transform: translateY(-100%);
+  }
+  
+  /* Mobile-optimized table */
+  .table-mobile {
+    @apply block w-full overflow-x-auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Sticky headers for mobile */
+  .sticky-header {
+    @apply sticky top-0 z-30 bg-white/95 backdrop-blur-md;
+  }
+  
+  /* Mobile navigation active state */
+  .nav-active {
+    @apply relative;
+  }
+  
+  .nav-active::after {
+    content: '';
+    @apply absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-blue-600 rounded-full;
+  }
+}
+
+@layer utilities {
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Prevent pull-to-refresh on mobile */
+  .no-overscroll {
+    overscroll-behavior: none;
+  }
+  
+  /* Safe area utilities */
+  .h-safe-area-top {
+    height: env(safe-area-inset-top, 0px);
+  }
+  
+  .h-safe-area-bottom {
+    height: env(safe-area-inset-bottom, 0px);
+  }
+  
+  /* Animation utilities */
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  .animate-slide-down {
+    animation: slideDown 0.3s ease-out;
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-out;
+  }
+  
+  /* Touch feedback */
+  .touch-feedback {
+    @apply active:scale-95 active:opacity-80 transition-all duration-150;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* PWA manifest styles */
+@media (display-mode: standalone) {
+  body {
+    @apply pt-safe;
+  }
+  
+  .mobile-nav {
+    @apply pb-safe;
+  }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  /* Add dark mode styles here when needed */
+}
+
+/* iOS specific fixes */
+@supports (-webkit-touch-callout: none) {
+  .ios-fix {
+    @apply h-screen; /* Fixes iOS 100vh issue */
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "common": {
+    "appName": "TRM",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search",
+    "submit": "Submit",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "confirm": "Confirm",
+    "success": "Success",
+    "warning": "Warning",
+    "info": "Information"
+  },
+  "auth": {
+    "login": {
+      "title": "Sign In",
+      "email": "Email Address",
+      "password": "Password",
+      "submit": "Sign In",
+      "forgotPassword": "Forgot Password?",
+      "noAccount": "Don't have an account?",
+      "register": "Sign Up"
+    },
+    "register": {
+      "title": "Create Account",
+      "name": "Full Name",
+      "email": "Email Address",
+      "password": "Password",
+      "confirmPassword": "Confirm Password",
+      "submit": "Create Account",
+      "hasAccount": "Already have an account?",
+      "login": "Sign In"
+    }
+  },
+  "navigation": {
+    "home": "Home",
+    "jobs": "Jobs",
+    "referrals": "Referrals",
+    "payouts": "Payouts",
+    "profile": "Profile",
+    "settings": "Settings",
+    "logout": "Logout",
+    "dashboard": "Dashboard",
+    "admin": "Admin"
+  },
+  "jobs": {
+    "title": "Jobs",
+    "searchPlaceholder": "Search jobs...",
+    "filter": "Filter",
+    "location": "Location",
+    "salary": "Salary",
+    "type": "Job Type",
+    "apply": "Apply Now",
+    "refer": "Refer Friend",
+    "posted": "Posted {{date}}",
+    "deadline": "Deadline: {{date}}"
+  },
+  "referrals": {
+    "title": "My Referrals",
+    "makeReferral": "Make a Referral",
+    "status": {
+      "pending": "Pending",
+      "contacted": "Contacted",
+      "interviewing": "Interviewing",
+      "hired": "Hired",
+      "rejected": "Rejected"
+    },
+    "reward": "Reward: {{amount}}"
+  },
+  "payouts": {
+    "title": "Payouts",
+    "available": "Available Balance",
+    "pending": "Pending",
+    "total": "Total Earned",
+    "request": "Request Payout",
+    "history": "Payout History"
+  },
+  "validation": {
+    "required": "This field is required",
+    "email": "Please enter a valid email",
+    "minLength": "Must be at least {{count}} characters",
+    "maxLength": "Must be at most {{count}} characters",
+    "passwordMatch": "Passwords do not match"
+  }
+}

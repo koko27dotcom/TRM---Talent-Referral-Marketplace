@@ -1,0 +1,92 @@
+{
+  "common": {
+    "appName": "TRM",
+    "loading": "[TH] Loading...",
+    "error": "[TH] An error occurred",
+    "save": "[TH] Save",
+    "cancel": "[TH] Cancel",
+    "delete": "[TH] Delete",
+    "edit": "[TH] Edit",
+    "create": "[TH] Create",
+    "search": "[TH] Search",
+    "submit": "[TH] Submit",
+    "close": "[TH] Close",
+    "back": "[TH] Back",
+    "next": "[TH] Next",
+    "confirm": "[TH] Confirm",
+    "success": "[TH] Success",
+    "warning": "[TH] Warning",
+    "info": "[TH] Information"
+  },
+  "auth": {
+    "login": {
+      "title": "[TH] Sign In",
+      "email": "[TH] Email Address",
+      "password": "[TH] Password",
+      "submit": "[TH] Sign In",
+      "forgotPassword": "[TH] Forgot Password?",
+      "noAccount": "[TH] Don't have an account?",
+      "register": "[TH] Sign Up"
+    },
+    "register": {
+      "title": "[TH] Create Account",
+      "name": "[TH] Full Name",
+      "email": "[TH] Email Address",
+      "password": "[TH] Password",
+      "confirmPassword": "[TH] Confirm Password",
+      "submit": "[TH] Create Account",
+      "hasAccount": "[TH] Already have an account?",
+      "login": "[TH] Sign In"
+    }
+  },
+  "navigation": {
+    "home": "[TH] Home",
+    "jobs": "[TH] Jobs",
+    "referrals": "[TH] Referrals",
+    "payouts": "[TH] Payouts",
+    "profile": "[TH] Profile",
+    "settings": "[TH] Settings",
+    "logout": "[TH] Logout",
+    "dashboard": "[TH] Dashboard",
+    "admin": "[TH] Admin"
+  },
+  "jobs": {
+    "title": "[TH] Jobs",
+    "searchPlaceholder": "[TH] Search jobs...",
+    "filter": "[TH] Filter",
+    "location": "[TH] Location",
+    "salary": "[TH] Salary",
+    "type": "[TH] Job Type",
+    "apply": "[TH] Apply Now",
+    "refer": "[TH] Refer Friend",
+    "posted": "[TH] Posted {{date}}",
+    "deadline": "[TH] Deadline: {{date}}"
+  },
+  "referrals": {
+    "title": "[TH] My Referrals",
+    "makeReferral": "[TH] Make a Referral",
+    "status": {
+      "pending": "[TH] Pending",
+      "contacted": "[TH] Contacted",
+      "interviewing": "[TH] Interviewing",
+      "hired": "[TH] Hired",
+      "rejected": "[TH] Rejected"
+    },
+    "reward": "[TH] Reward: {{amount}}"
+  },
+  "payouts": {
+    "title": "[TH] Payouts",
+    "available": "[TH] Available Balance",
+    "pending": "[TH] Pending",
+    "total": "[TH] Total Earned",
+    "request": "[TH] Request Payout",
+    "history": "[TH] Payout History"
+  },
+  "validation": {
+    "required": "[TH] This field is required",
+    "email": "[TH] Please enter a valid email",
+    "minLength": "[TH] Must be at least {{count}} characters",
+    "maxLength": "[TH] Must be at most {{count}} characters",
+    "passwordMatch": "[TH] Passwords do not match"
+  }
+}
