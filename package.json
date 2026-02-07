@@ -53,6 +53,7 @@
     "bull": "^4.16.5",
     "canvas-confetti": "^1.9.4",
     "chart.js": "^4.5.1",
+    "cheerio": "^1.2.0",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "ethers": "^6.16.0",
