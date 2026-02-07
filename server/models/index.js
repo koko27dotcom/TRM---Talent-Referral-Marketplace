@@ -164,7 +164,7 @@ module.exports = {
   DEVICE_TYPES,
   PLATFORMS,
   AnalyticsSession,
-  SESSION_STATUS,
+  ANALYTICS_SESSION_STATUS,
   TRAFFIC_SOURCES,
   SalaryBenchmark,
   MarketTrend,
