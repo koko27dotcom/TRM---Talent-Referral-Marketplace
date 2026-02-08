@@ -117,19 +117,10 @@ const getCorsOrigins = () => {
 
 const corsOptions = {
   origin: (origin, callback) => {
-    const allowedOrigins = getCorsOrigins();
-    // Allow requests with no origin (mobile apps, curl, etc.)
-    if (!origin) return callback(null, true);
-    // Allow same-origin requests (origin matches host)
-    if (process.env.NODE_ENV === 'production' && origin.includes('trm-referral-platform')) {
-      return callback(null, true);
-    }
-    if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
-      callback(null, true);
-    } else {
-      console.warn(`CORS blocked origin: ${origin}`);
-      callback(null, true); // Allow all origins in production for now
-    }
+    // Allow all origins - this is needed for the SPA to load static assets
+    // The origin header is not sent for same-origin requests (like loading static assets)
+    // but CORS middleware still processes them
+    callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
