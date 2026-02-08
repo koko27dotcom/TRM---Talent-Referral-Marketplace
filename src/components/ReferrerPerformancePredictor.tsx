@@ -62,7 +62,7 @@ export default function ReferrerPerformancePredictor({
   const [selectedTier, setSelectedTier] = useState<string>('all')
   const [sortBy, setSortBy] = useState<string>('score')
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1'
+  const API_URL = import.meta.env.VITE_API_URL || '/api/v1'
 
   useEffect(() => {
     if (referrerId) {

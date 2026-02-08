@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import path from 'path';
 
 // Production build tuning:
 // - Split vendor libraries into separate chunks for optimal caching
@@ -7,7 +8,13 @@ import react from '@vitejs/plugin-react';
 // - Optimize asset handling for CDN delivery
 export default defineConfig({
   plugins: [react()],
-  
+
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+
   // Server configuration for development
   server: {
     port: 5173,

@@ -65,7 +65,7 @@ export default function MarketTrendsView({ compact = false }: Props) {
   const [selectedIndustry, setSelectedIndustry] = useState<string>('all')
   const [timeRange, setTimeRange] = useState<string>('30')
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1'
+  const API_URL = import.meta.env.VITE_API_URL || '/api/v1'
 
   useEffect(() => {
     fetchTrends()

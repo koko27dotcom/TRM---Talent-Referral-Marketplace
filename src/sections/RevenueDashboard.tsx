@@ -115,7 +115,7 @@ export default function RevenueDashboard() {
   const [conversionRates, setConversionRates] = useState<ConversionRates | null>(null)
   const [cohorts, setCohorts] = useState<CohortData[]>([])
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1'
+  const API_URL = import.meta.env.VITE_API_URL || '/api/v1'
 
   // Fetch data
   useEffect(() => {

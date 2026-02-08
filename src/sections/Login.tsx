@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1'
 
 interface FormData {
   email: string
@@ -48,9 +48,9 @@ export default function Login() {
         throw new Error(data.error || data.message || 'Login failed')
       }
 
-      // Handle nested data structure (data.data contains user and token)
-      const user = data.data
-      const token = data.data?.token
+      // Handle nested data structure (data.data contains user and tokens)
+      const user = data.data?.user
+      const token = data.data?.tokens?.accessToken || data.data?.tokens?.token
 
       if (!user || !token) {
         throw new Error('Invalid response: missing user data')
@@ -64,7 +64,12 @@ export default function Login() {
       navigate('/dashboard')
       
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Login failed'
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'string'
+            ? err
+            : JSON.stringify(err)
       setError(errorMessage)
     } finally {
       setLoading(false)

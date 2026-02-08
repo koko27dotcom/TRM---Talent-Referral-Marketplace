@@ -158,6 +158,7 @@ router.post('/login', asyncHandler(async (req, res) => {
   const user = await User.findByEmail(email).select('+password');
   
   if (!user) {
+    console.warn('[Auth/Login] User not found for email:', email);
     throw new AuthenticationError('Invalid email or password');
   }
   
@@ -172,11 +173,13 @@ router.post('/login', asyncHandler(async (req, res) => {
   if (!isPasswordValid) {
     // Increment login attempts
     await user.incrementLoginAttempts();
+    console.warn('[Auth/Login] Invalid password for email:', email);
     throw new AuthenticationError('Invalid email or password');
   }
   
   // Check if account is active
   if (user.status !== 'active') {
+    console.warn('[Auth/Login] Inactive account:', email, 'status:', user.status);
     throw new AuthenticationError('Account is not active. Please contact support.');
   }
   
@@ -223,6 +226,7 @@ router.post('/login', asyncHandler(async (req, res) => {
     severity: 'info',
   });
   
+  console.info('[Auth/Login] Success:', email, 'userId:', user._id);
   res.json({
     success: true,
     message: 'Login successful',

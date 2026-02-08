@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { Link, useNavigate } from 'react-router-dom'
 import { Mail, Lock, Eye, EyeOff, ArrowLeft, Loader2, User, Building2 } from 'lucide-react'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1'
 
 interface FormData {
   email: string
@@ -38,8 +38,8 @@ export default function Register() {
         setError('Passwords do not match')
         return
       }
-      if (formData.password.length < 6) {
-        setError('Password must be at least 6 characters')
+      if (formData.password.length < 8) {
+        setError('Password must be at least 8 characters')
         return
       }
       setError('')
@@ -55,8 +55,8 @@ export default function Register() {
         email: formData.email,
         password: formData.password,
         name: formData.name,
-        type: formData.type,
-        ...(formData.type === 'recruiter' && { company: formData.company })
+        role: formData.type === 'recruiter' ? 'corporate_admin' : 'job_seeker',
+        ...(formData.type === 'recruiter' && { companyName: formData.company })
       }
 
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
@@ -71,7 +71,11 @@ export default function Register() {
         let errorMessage = 'Registration failed'
         try {
           const errorData = await response.json()
-          errorMessage = errorData.message || errorData.error || JSON.stringify(errorData)
+          const nestedError =
+            typeof errorData.error === 'string'
+              ? errorData.error
+              : errorData.error?.message
+          errorMessage = errorData.message || nestedError || JSON.stringify(errorData)
         } catch {
           // If response is not JSON, read as text
           errorMessage = await response.text()
@@ -85,9 +89,9 @@ export default function Register() {
         throw new Error(data.message || 'Registration failed')
       }
 
-      // Handle both response structures (data.user or data.data)
-      const user = data.user || data.data
-      const token = data.token || data.data?.token
+      // Handle current API response structure: { data: { user, tokens } }
+      const user = data.user || data.data?.user || data.data
+      const token = data.token || data.data?.token || data.data?.tokens?.accessToken
 
       // Only save to localStorage if we have valid data
       if (!user || !token) {
@@ -99,7 +103,12 @@ export default function Register() {
       navigate('/dashboard')
 
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Registration failed'
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'string'
+            ? err
+            : JSON.stringify(err)
       setError(errorMessage)
     } finally {
       setIsLoading(false)

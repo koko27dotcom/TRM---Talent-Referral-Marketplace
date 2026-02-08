@@ -33,7 +33,7 @@ interface JobDetailProps {
   jobs: Job[]
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1'
 
 export default function JobDetail({ jobs }: JobDetailProps) {
   const { id } = useParams()
@@ -209,7 +209,7 @@ export default function JobDetail({ jobs }: JobDetailProps) {
 
   const nativeShare = async (jobTitle: string, refCode: string) => {
     const shareData = {
-      title: `${jobTitle} - MyanJobs`,
+      title: `${jobTitle} - TRM Referral`,
       text: `Check out this ${jobTitle} position! Use my referral code ${refCode} to apply and earn rewards.`,
       url: window.location.href
     }

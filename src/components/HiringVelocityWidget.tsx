@@ -55,7 +55,7 @@ export default function HiringVelocityWidget({ jobId, compact = false }: Props) 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1'
+  const API_URL = import.meta.env.VITE_API_URL || '/api/v1'
 
   useEffect(() => {
     if (jobId) {

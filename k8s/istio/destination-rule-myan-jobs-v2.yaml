@@ -1,0 +1,23 @@
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: myan-jobs-destination
+  namespace: production
+spec:
+  host: myan-jobs.production.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+  subsets:
+    - name: v1
+      labels:
+        version: v1
+    - name: v2
+      labels:
+        version: v2
+
+# Notes:
+# - Applying this will replace the existing DestinationRule of the same name.
+# - Add a small `v2` deployment (debug or identical image) with label `version: v2` to test canary.
+# - ISTIO_MUTUAL keeps Envoy using Istio certs when initiating outbound connections.
+# - See: https://istio.io/latest/docs/reference/config/networking/destination-rule/

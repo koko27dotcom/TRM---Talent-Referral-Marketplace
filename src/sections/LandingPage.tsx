@@ -154,7 +154,7 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
         {/* Animated Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950">
           {/* Animated gradient orbs */}
           <motion.div 
             animate={{
@@ -166,7 +166,7 @@ export default function LandingPage() {
               repeat: Infinity,
               ease: "linear"
             }}
-            className="absolute top-20 left-10 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl"
+            className="absolute top-20 left-10 w-96 h-96 bg-blue-400/15 rounded-full blur-3xl"
           />
           <motion.div 
             animate={{
@@ -178,7 +178,7 @@ export default function LandingPage() {
               repeat: Infinity,
               ease: "linear"
             }}
-            className="absolute bottom-20 right-10 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl"
+            className="absolute bottom-20 right-10 w-96 h-96 bg-sky-400/15 rounded-full blur-3xl"
           />
           <motion.div 
             animate={{
@@ -189,7 +189,7 @@ export default function LandingPage() {
               repeat: Infinity,
               ease: "linear"
             }}
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-500/10 rounded-full blur-3xl"
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-500/10 rounded-full blur-3xl"
           />
           
           {/* Grid pattern */}
@@ -205,103 +205,125 @@ export default function LandingPage() {
 
         <motion.div
           style={{ y, opacity }}
-          className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32 text-center"
+          className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24"
         >
-          {/* Logo */}
+          {/* Top Bar */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="mb-8"
+            transition={{ duration: 0.5 }}
+            className="flex items-center justify-between gap-4 mb-12"
           >
-            <img
-              src="/trm-logo.svg"
-              alt="TRM Referral Platform"
-              className="h-16 sm:h-20 mx-auto drop-shadow-2xl"
-            />
+            <div className="flex items-center gap-3">
+              <img
+                src="/trm-logo.svg"
+                alt="TRM Referral Platform"
+                className="h-10 sm:h-12 drop-shadow-xl"
+              />
+              <div className="hidden sm:block">
+                <p className="text-white font-semibold tracking-wide">MyanJobs</p>
+                <p className="text-white/60 text-xs">Referral Platform</p>
+              </div>
+            </div>
+            <div className="hidden sm:flex items-center gap-3">
+              <button
+                onClick={() => navigate('/login')}
+                className="text-white/80 hover:text-white text-sm font-medium transition"
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => navigate('/register')}
+                className="px-4 py-2 rounded-full bg-white/10 text-white text-sm font-semibold border border-white/20 hover:bg-white/20 transition"
+              >
+                Get Started
+              </button>
+            </div>
           </motion.div>
 
-          {/* Trust Badge */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 mb-8"
-          >
-            <Sparkles className="w-4 h-4 text-yellow-400" />
-            <span className="text-white/90 text-sm font-medium">Over 45M MMK paid to referrers</span>
-          </motion.div>
+          <div className="flex flex-col items-center md:items-start text-center md:text-left">
+            {/* Trust Badge */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 mb-6"
+            >
+              <Sparkles className="w-4 h-4 text-yellow-400" />
+              <span className="text-white/90 text-sm font-medium">Over 45M MMK paid to referrers</span>
+            </motion.div>
 
           {/* Main Headline */}
-          <motion.h1
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight"
-          >
-            Refer Talent.
-            <br />
-            <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-              Earn Rewards.
-            </span>
-          </motion.h1>
+            <motion.h1
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight"
+            >
+              Refer Talent.
+              <br />
+              <span className="bg-gradient-to-r from-blue-400 via-sky-300 to-cyan-300 bg-clip-text text-transparent">
+                Earn Rewards.
+              </span>
+            </motion.h1>
 
           {/* Subheadline */}
-          <motion.p
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="text-xl text-white/70 max-w-2xl mx-auto mb-10"
-          >
-            Connect talented professionals with their dream jobs and earn up to 300,000 MMK per successful referral.
-          </motion.p>
+            <motion.p
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              className="text-xl text-white/70 max-w-2xl mx-auto mb-10 md:mx-0"
+            >
+              Connect talented professionals with their dream jobs and earn up to 300,000 MMK per successful referral.
+            </motion.p>
 
           {/* CTA Buttons */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-            className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16"
-          >
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => navigate('/register')}
-              className="group flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-full font-semibold text-lg hover:from-blue-600 hover:to-purple-700 transition-all shadow-lg shadow-blue-500/25"
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start items-center sm:items-start mb-16"
             >
-              Start Referring
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </motion.button>
-            
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => navigate('/jobs')}
-              className="flex items-center gap-2 px-8 py-4 bg-white/10 backdrop-blur-sm text-white rounded-full font-semibold text-lg border border-white/20 hover:bg-white/20 transition-all"
-            >
-              Browse Jobs
-            </motion.button>
-          </motion.div>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => navigate('/register')}
+                className="group flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-600 to-sky-600 text-white rounded-full font-semibold text-lg hover:from-blue-700 hover:to-sky-700 transition-all shadow-lg shadow-blue-600/25"
+              >
+                Start Referring
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </motion.button>
+              
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => navigate('/jobs')}
+                className="flex items-center gap-2 px-8 py-4 bg-white/10 backdrop-blur-sm text-white rounded-full font-semibold text-lg border border-white/20 hover:bg-white/20 transition-all"
+              >
+                Browse Jobs
+              </motion.button>
+            </motion.div>
 
           {/* Stats */}
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-            className="grid grid-cols-2 lg:grid-cols-4 gap-6 max-w-4xl mx-auto"
-          >
-            {stats.map((stat, index) => (
-              <motion.div
-                key={index}
-                whileHover={{ y: -5 }}
-                className="text-center p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10"
-              >
-                <stat.icon className="w-6 h-6 text-blue-400 mx-auto mb-2" />
-                <div className="text-3xl font-bold text-white mb-1">{stat.value}</div>
-                <div className="text-sm text-white/60">{stat.label}</div>
-              </motion.div>
-            ))}
-          </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="grid grid-cols-2 lg:grid-cols-4 gap-6 max-w-4xl mx-auto md:mx-0"
+            >
+              {stats.map((stat, index) => (
+                <motion.div
+                  key={index}
+                  whileHover={{ y: -5 }}
+                  className="text-center p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10"
+                >
+                  <stat.icon className="w-6 h-6 text-blue-400 mx-auto mb-2" />
+                  <div className="text-3xl font-bold text-white mb-1">{stat.value}</div>
+                  <div className="text-sm text-white/60">{stat.label}</div>
+                </motion.div>
+              ))}
+            </motion.div>
+          </div>
         </motion.div>
 
         {/* Scroll Indicator */}

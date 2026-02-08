@@ -1,0 +1,35 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: myan-jobs-vs
+  namespace: production
+spec:
+  # Public host served by the Istio ingressgateway. Replace with your real host.
+  hosts:
+    - myan-jobs.example.com
+  # Use the ingressgateway in istio-system (common default). Change if you use a different gateway.
+  gateways:
+    - istio-system/ingressgateway
+  http:
+    - name: http-all
+      match:
+        - uri:
+            prefix: "/"
+      route:
+        - destination:
+            host: myan-jobs.production.svc.cluster.local
+            port:
+              number: 80
+            subset: v1
+          weight: 100
+      # Conservative production-safe defaults: 30s timeout, limited retries
+      timeout: 30s
+      retries:
+        attempts: 2
+        perTryTimeout: 2s
+
+# Notes:
+# - Keep VirtualService minimal; avoid heavy header rewrites or overly permissive CORS.
+# - If you terminate TLS at the ingressgateway, ensure gateway TLS settings are configured
+#   to use the correct certs and SAN for `myan-jobs.example.com`.
+# - See: https://istio.io/latest/docs/reference/config/networking/virtual-service/

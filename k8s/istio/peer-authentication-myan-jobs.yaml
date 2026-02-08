@@ -1,0 +1,16 @@
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: myan-jobs-mtls
+  namespace: production
+spec:
+  # During migration we use PERMISSIVE so both plaintext and mTLS traffic are accepted.
+  # This avoids breaking callers that haven't migrated yet. After verification switch
+  # to STRICT to enforce mTLS only.
+  # See: https://istio.io/latest/docs/tasks/security/authentication/peer-auth/
+  mtls:
+    mode: PERMISSIVE
+
+# Notes:
+# - STRICT prevents plaintext traffic to workloads; use PERMISSIVE during migration.
+# - See: https://istio.io/latest/docs/tasks/security/authentication/peer-auth/

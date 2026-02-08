@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import { Briefcase, Building2, MapPin, DollarSign, FileText, List, Gift, ArrowLeft, Loader2, Sparkles, Zap } from 'lucide-react'
 import PricingCalculator from '../components/PricingCalculator'
 
-const API_BASE_URL = 'http://localhost:3001/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1'
 
 interface FormData {
   title: string

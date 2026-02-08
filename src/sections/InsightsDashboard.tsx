@@ -34,7 +34,7 @@ export default function InsightsDashboard() {
   const [recentInsights, setRecentInsights] = useState<RecentInsight[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1'
+  const API_URL = import.meta.env.VITE_API_URL || '/api/v1'
 
   useEffect(() => {
     fetchDashboardData()

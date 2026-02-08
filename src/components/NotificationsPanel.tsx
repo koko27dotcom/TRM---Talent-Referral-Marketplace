@@ -125,7 +125,7 @@ export default function NotificationsPanel({ isOpen, onClose }: NotificationsPan
       {
         id: '5',
         type: 'system',
-        title: 'Welcome to MyanJobs Referral Platform',
+        title: 'Welcome to TRM Referral Platform',
         message: 'Start referring candidates and earn bonuses when they get hired!',
         isRead: true,
         createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString()

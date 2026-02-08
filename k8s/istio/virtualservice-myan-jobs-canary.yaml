@@ -1,0 +1,34 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: myan-jobs-vs-canary
+  namespace: production
+spec:
+  hosts:
+    - myan-jobs.example.com
+  gateways:
+    - istio-system/ingressgateway
+  http:
+    - name: canary-split
+      match:
+        - uri:
+            prefix: "/"
+      route:
+        - destination:
+            host: myan-jobs.production.svc.cluster.local
+            subset: v1
+          weight: 95
+        - destination:
+            host: myan-jobs.production.svc.cluster.local
+            subset: v2
+          weight: 5
+      timeout: 30s
+      retries:
+        attempts: 2
+        perTryTimeout: 2s
+
+# Notes:
+# - This canary routes a small percentage to `v2` (requires deployment with label `version: v2`).
+# - Apply this to test STRICT enforcement on a low percentage of traffic before a full switch.
+# - After testing, either remove the canary VirtualService or update weights to promote v2.
+# - See: https://istio.io/latest/docs/tasks/traffic-management/traffic-shifting/

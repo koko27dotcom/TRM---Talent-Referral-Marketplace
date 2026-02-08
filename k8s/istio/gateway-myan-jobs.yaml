@@ -1,0 +1,25 @@
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: myan-jobs-gateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      tls:
+        # Terminate TLS at the ingress gateway. Replace `myan-jobs.example.com` with your SAN.
+        mode: SIMPLE
+        credentialName: myan-jobs-tls-secret # Kubernetes secret in `istio-system` containing TLS cert/key
+      hosts:
+        - myan-jobs.example.com
+
+# Notes:
+# - Use `mode: SIMPLE` when gateway terminates TLS using a Kubernetes secret.
+# - For mutual TLS between gateway and services, see TLS origination patterns in Istio docs.
+# - Ensure `credentialName` points to a valid Kubernetes TLS secret in the same namespace as the Gateway.
+# - See: https://istio.io/latest/docs/tasks/traffic-management/ingress/secure-ingress/

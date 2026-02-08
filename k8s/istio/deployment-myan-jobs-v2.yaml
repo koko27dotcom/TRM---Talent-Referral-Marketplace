@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myan-jobs-v2
+  namespace: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: myan-jobs
+      version: v2
+  template:
+    metadata:
+      labels:
+        app: myan-jobs
+        version: v2
+      annotations:
+        # Optional: force sidecar injection if namespace is not labeled
+        sidecar.istio.io/inject: "true"
+    spec:
+      containers:
+        - name: myan-jobs
+          # IMPORTANT: replace this with the image your service uses (registry/image:tag)
+          image: REPLACE_WITH_YOUR_IMAGE
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 30
+            periodSeconds: 10
+
+# Notes:
+# - This is a small, safe `v2` deployment template to test the canary VirtualService.
+# - Ensure the service selector for your ClusterIP service matches `app: myan-jobs` so
+#   traffic is routed to these pods. If your service uses a different selector, change the
+#   labels and selector accordingly.
+# - After creating this deployment, apply `k8s/istio/destination-rule-myan-jobs-v2.yaml`
+#   and `k8s/istio/virtualservice-myan-jobs-canary.yaml` to route 5% traffic to v2.

@@ -1,0 +1,16 @@
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: myan-jobs-mtls
+  namespace: production
+spec:
+  # Enforce mTLS-only for incoming connections in this namespace.
+  # Apply only after you have verified PERMISSIVE migration and confirmed no plaintext-only clients.
+  # This policy will reject plaintext (non-mTLS) traffic.
+  mtls:
+    mode: STRICT
+
+# Safety notes:
+# - Keep this file small: it only changes the acceptance mode.
+# - Have your rollback command ready before applying (see README/notes in this repo).
+# - See: https://istio.io/latest/docs/tasks/security/authentication/peer-auth/

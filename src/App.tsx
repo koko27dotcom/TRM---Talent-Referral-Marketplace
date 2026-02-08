@@ -20,6 +20,7 @@ import SubscriptionPlans from './sections/SubscriptionPlans'
 import LeadScoreDashboard from './sections/LeadScoreDashboard'
 import EmailCampaignManager from './sections/EmailCampaignManager'
 import ResumeOptimizer from './sections/ResumeOptimizer'
+import ForRecruiters from './sections/ForRecruiters'
 
 export interface Job {
   id: number
@@ -418,6 +419,22 @@ const jobsData: Job[] = [
   }
 ]
 
+// Import additional sections for routes
+import CommunityFeed from './sections/CommunityFeed'
+import EventManager from './sections/EventManager'
+import GamificationDashboard from './sections/GamificationDashboard'
+import InsightsDashboard from './sections/InsightsDashboard'
+import AnalyticsAdminDashboard from './sections/AnalyticsAdminDashboard'
+import RevenueDashboard from './sections/RevenueDashboard'
+import PayoutDashboard from './sections/PayoutDashboard'
+import TalentPoolDashboard from './sections/TalentPoolDashboard'
+import EnterprisePortal from './sections/EnterprisePortal'
+import PartnerPortal from './sections/PartnerPortal'
+import DataMarketplace from './sections/DataMarketplace'
+import APIDocumentation from './sections/APIDocumentation'
+import APIKeyManager from './sections/APIKeyManager'
+import DesignSystem from './pages/DesignSystem'
+
 function App() {
   return (
     <Router>
@@ -435,11 +452,26 @@ function App() {
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/leads" element={<><Navigation /><LeadScoreDashboard /><MobileNav /></>} />
           <Route path="/admin/email" element={<><Navigation /><EmailCampaignManager /><MobileNav /></>} />
+          <Route path="/admin/analytics" element={<><Navigation /><AnalyticsAdminDashboard /><MobileNav /></>} />
+          <Route path="/admin/revenue" element={<><Navigation /><RevenueDashboard /><MobileNav /></>} />
+          <Route path="/admin/payouts" element={<><Navigation /><PayoutDashboard /><MobileNav /></>} />
           <Route path="/resume-optimizer" element={<><Navigation /><ResumeOptimizer /><MobileNav /></>} />
           <Route path="/billing" element={<><Navigation /><BillingDashboard /><MobileNav /></>} />
           <Route path="/plans" element={<><Navigation /><SubscriptionPlans /><MobileNav /></>} />
           <Route path="/referral-tracking" element={<><Navigation /><ReferralTracking /><MobileNav /></>} />
+          <Route path="/for-recruiters" element={<><Navigation /><ForRecruiters /><MobileNav /></>} />
           <Route path="/edit-job/:id" element={<><Navigation /><EditJob /><MobileNav /></>} />
+          <Route path="/community" element={<><Navigation /><CommunityFeed /><MobileNav /></>} />
+          <Route path="/events" element={<><Navigation /><EventManager /><MobileNav /></>} />
+          <Route path="/gamification" element={<><Navigation /><GamificationDashboard /><MobileNav /></>} />
+          <Route path="/insights" element={<><Navigation /><InsightsDashboard /><MobileNav /></>} />
+          <Route path="/talent-pool" element={<><Navigation /><TalentPoolDashboard /><MobileNav /></>} />
+          <Route path="/enterprise" element={<EnterprisePortal />} />
+          <Route path="/partner" element={<PartnerPortal />} />
+          <Route path="/data-marketplace" element={<><Navigation /><DataMarketplace /><MobileNav /></>} />
+          <Route path="/api-docs" element={<><Navigation /><APIDocumentation /><MobileNav /></>} />
+          <Route path="/api-keys" element={<><Navigation /><APIKeyManager /><MobileNav /></>} />
+          <Route path="/design-system" element={<DesignSystem />} />
         </Routes>
       </div>
     </Router>

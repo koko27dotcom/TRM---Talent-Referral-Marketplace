@@ -52,14 +52,18 @@ function metricsMiddleware() {
     res.end = function (...args) {
       metrics.httpRequestsInFlight--;
 
-      const endTime = process.hrtime.bigint();
-      const durationNs = Number(endTime - startTime);
-      const durationSeconds = durationNs / 1e9;
+      try {
+        const endTime = process.hrtime.bigint();
+        const durationNs = Number(endTime - startTime);
+        const durationSeconds = durationNs / 1e9;
 
-      // Normalize route to prevent high cardinality
-      const route = normalizeRoute(req.route?.path || req.path || req.url);
+        // Normalize route to prevent high cardinality
+        const route = normalizeRoute(req.route?.path || req.path || req.url || req.originalUrl);
 
-      recordRequest(req.method, route, res.statusCode, durationSeconds);
+        recordRequest(req.method, route, res.statusCode, durationSeconds);
+      } catch (error) {
+        console.warn('[Metrics] Failed to record request metrics:', error?.message || error);
+      }
 
       originalEnd.apply(this, args);
     };
@@ -72,7 +76,11 @@ function metricsMiddleware() {
  * Normalize route to prevent high cardinality metrics
  * e.g., /api/v1/jobs/507f1f77bcf86cd799439011 → /api/v1/jobs/:id
  */
-function normalizeRoute(path) {
+function normalizeRoute(pathValue) {
+  if (!pathValue) {
+    return 'unknown';
+  }
+  const path = typeof pathValue === 'string' ? pathValue : String(pathValue);
   return path
     .replace(/\/[0-9a-fA-F]{24}/g, '/:id') // MongoDB ObjectIDs
     .replace(/\/\d+/g, '/:id') // Numeric IDs

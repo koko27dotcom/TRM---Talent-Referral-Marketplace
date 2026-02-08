@@ -17,7 +17,11 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": false,
     "allowJs": true,
-    "checkJs": false
+    "checkJs": false,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }]

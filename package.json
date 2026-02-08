@@ -1,5 +1,5 @@
 {
-  "name": "myan-jobs",
+  "name": "trm-referral",
   "private": true,
   "version": "0.0.0",
   "scripts": {
@@ -54,6 +54,10 @@
     "health:check": "curl -s http://localhost:3000/health/deep | node -e \"process.stdin.resume(); process.stdin.on('data', d => { const h = JSON.parse(d); console.log(JSON.stringify(h, null, 2)); process.exit(h.status === 'healthy' ? 0 : 1); })\""
   },
   "dependencies": {
+    "@radix-ui/react-avatar": "^1.1.11",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@radix-ui/react-toast": "^1.2.15",
     "@sendgrid/mail": "^8.1.6",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.23",
@@ -62,6 +66,8 @@
     "canvas-confetti": "^1.9.4",
     "chart.js": "^4.5.1",
     "cheerio": "^1.2.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "ethers": "^6.16.0",
@@ -91,7 +97,9 @@
     "react-router-dom": "^6.21.0",
     "recharts": "^3.7.0",
     "stripe": "^14.25.0",
+    "tailwind-merge": "^3.4.0",
     "tailwindcss": "^3.4.19",
+    "tailwindcss-animate": "^1.0.7",
     "typescript": "^5.2.2",
     "vite": "^5.0.8",
     "zod": "^3.22.4"

@@ -1,0 +1,22 @@
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: myan-jobs-destination
+  namespace: production
+spec:
+  # Use full cluster-local FQDN so Istio's sidecars and control plane match traffic.
+  host: myan-jobs.production.svc.cluster.local
+  trafficPolicy:
+    # Use ISTIO_MUTUAL so the Envoy sidecars present/validate Istio-issued certs
+    tls:
+      mode: ISTIO_MUTUAL
+  # Subsets are useful for controlled rollouts; keep a minimal v1 subset.
+  subsets:
+    - name: v1
+      labels:
+        version: v1
+
+# Notes:
+# - ISTIO_MUTUAL requires that istiod (or external CA) is configured to provide certs.
+# - If you use headless services or port-level policies, you may need per-port settings.
+# - See: https://istio.io/latest/docs/reference/config/networking/destination-rule/
